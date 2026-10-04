@@ -4,9 +4,10 @@
 <title>E-Gate Planner</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="E-Gate">
+<meta name="apple-mobile-web-app-title" content="Wake Up">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -45,92 +46,172 @@ button.ghost{background:transparent;color:var(--mute);font-weight:500;padding:6p
 .warn{color:var(--warn);font-size:13px;margin-top:8px}
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
 .empty{text-align:center;color:var(--mute);padding:28px 10px}
+
+.tm b{font-size:30px;white-space:nowrap}
+.sec2{background:var(--bg);color:var(--ink);border:1px solid var(--line);width:100%}
+details{margin-top:12px}summary{cursor:pointer;color:var(--mute);font-size:14px}
+.dtx p{font-size:13px;color:var(--mute);margin:8px 0 0}
+textarea{width:100%;min-height:64px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;font:12px ui-monospace,monospace;margin:10px 0 8px}
+.wake .al{margin-left:auto;align-self:center;background:none;padding:6px;color:var(--mute);opacity:.45;line-height:0}
+.wake .al.on{color:var(--acc);opacity:1}.wake .al.on svg{stroke-width:2.5}
+button:disabled{opacity:.45}#st{margin-top:10px}
+details.card{margin-top:0;padding:14px 16px}details.card>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;color:var(--ink);font-size:15px;font-weight:600}
+details.card>summary::-webkit-details-marker{display:none}details.card>summary::after{content:"›";color:var(--mute);font-size:20px;line-height:1;transition:transform .2s}details.card[open]>summary::after{transform:rotate(90deg)}
+.mi{padding-top:12px}.bl{padding-top:12px}.bl+.bl{border-top:1px solid var(--line);margin-top:12px}.bl small{color:var(--mute);font-size:12.5px}
+.br{display:flex;align-items:baseline;gap:10px}.br b{font-size:28px;font-variant-numeric:tabular-nums}.br span,.th{color:var(--mute);font-size:13px}
+.al{background:none;padding:4px;color:var(--mute);opacity:.45;line-height:0}.al.on{color:var(--acc);opacity:1}.al.on svg{stroke-width:2.5}
+.sv{display:flex;align-items:center;gap:6px}.al.sm svg{width:20px;height:20px}
+.duty .step{padding-right:38px}.step .al{position:absolute;right:5px;top:50%;transform:translateY(-50%)}
 </style></head><body><main>
 <h1>E-Gate Planner</h1>
-<p class="sub">Type your e-gate time. Get your bus and wake-up time.</p>
+<p class="sub">Upload your roster. Get your bus and wake-up time.</p>
+<details class="card" id="bus"><summary>Next buses</summary><div id="bx"></div></details>
+
 <div class="card">
+  <button class="sec2" id="up">Upload roster PDF</button>
+  <input type="file" id="fl" accept="application/pdf,.pdf" hidden>
+  <p class="hint" id="st" hidden></p>
+  <details><summary>Details</summary><div class="dtx">
+    <p>Upload your My Roster PDF. The app reads it on your phone, finds every flight leaving DXB and sets each e-gate 2h30 before departure. Check them against your roster the first few times. The first upload needs an internet connection.</p>
+    <p>Typing: 4 digits, e.g. 1430. A short 615 reads as 06:15. The date moves on a day after each add.</p>
+    <p>Alarms: tap the clock next to the wake-up time or the leave-home time to add that alarm through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
+    <p>All times are Dubai time (GMT+4). Duties disappear 1 hour after e-gate.</p>
+  </div></details>
+</div>
+<div class="card tm" id="tm" hidden><div><small id="tl"></small><span id="tw"></span></div><b id="tt"></b></div>
+<div id="list"></div>
+<details class="card man"><summary>Add e-gate manually</summary><div class="mi">
   <label>Date</label>
   <div class="dt"><button id="dm" aria-label="Previous day">‹</button><b id="dd"></b><button id="dpl" aria-label="Next day">›</button></div>
   <label for="eg">E-gate time (24h)</label>
   <div class="row"><input id="eg" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off"><button id="add">Add</button></div>
-  <p class="err" id="er" hidden></p>
-  <p class="hint" id="rd"></p>
-</div>
-<div class="card tm" id="tm" hidden><div><small id="tl">Next wake-up</small><span id="tw"></span></div><b id="tt"></b></div>
-<div id="list"></div>
+  <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
+</div></details>
 <div class="foot"><button class="ghost" id="clr">Clear all</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.11 Aligned</p>
 </main>
 <script>
-const WALK=10,PREP=60,MAXEARLY=20;
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
-const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,"0");
+const E="0005 0020 0040 0100 0120 0140 0200 0220 0240 0305 0330 0355 0415 0435 0455 0515 0535 0555 0615 0635 0655 0715 0735 0755 0815 0835 0855 0920 0945 1010 1035 1100 1125 1150 1215 1240 1305 1330 1355 1420 1445 1510 1535 1555 1615 1635 1655 1715 1735 1800 1825 1850 1915 1940 2005 2030 2055 2120 2145 2210 2230 2250 2310 2330 2350".split(" ").map(s=>+s.slice(0,2)*60+ +s.slice(2)),H=E.map((e,i)=>({d:e,dur:(T[i].d-e+1440)%1440}));
+const WALK=10,PREP=60,MAXEARLY=20,OFF=4*36e5,SHORTCUT="E-Gate Alarm";
+const $=i=>document.getElementById(i),pad=n=>String(n).padStart(2,"0"),esc=s=>String(s??"").replace(/[&<>"]/g,c=>"&#"+c.charCodeAt(0)+";");
+const wall=(y,m,d,h=0,mi=0)=>Date.UTC(y,m,d,h,mi)-OFF,W=ms=>new Date(ms+OFF);
+const hm=x=>{const d=W(+x);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())};
+const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
+const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
+const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
 let duties=[];
-try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>d.t)}catch(e){}
-const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties:duties.map(t=>({t}))}))}catch(e){}};
-const hm=d=>pad(d.getHours())+":"+pad(d.getMinutes());
-const dl=d=>d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
-function plan(ms){
-  const e=new Date(ms),day0=new Date(e.getFullYear(),e.getMonth(),e.getDate()).getTime(),E=(ms-day0)/60000;
-  let b=null;
+try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:+d.t,f:d.f||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
+const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
+function addDuty(t,f){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f}else duties.push({t,f:f||"",a:false,l:false})}
+function plan(eg){
+  const d0=day0(eg),E=(eg-d0)/6e4;let b=null;
   for(const o of[-1,0])for(const t of T){const dep=o*1440+t.d,arr=dep+t.dur;if(arr<=E&&(!b||arr>b.arr))b={dep,arr}}
-  const at=m=>new Date(day0+m*60000),dep=at(b.dep);
+  const at=m=>d0+m*6e4,dep=at(b.dep);
   const nx=T.flatMap(t=>[0,1].map(o=>({dep:o*1440+t.d,arr:o*1440+t.d+t.dur}))).filter(x=>x.dep>b.dep).sort((a,c)=>a.dep-c.dep)[0];
-  return{egate:e,dep,arr:at(b.arr),gap:E-b.arr,leave:new Date(dep-WALK*6e4),wake:new Date(dep-(WALK+PREP)*6e4),backup:at(nx.dep),backupArr:at(nx.arr)};
+  return{dep,arr:at(b.arr),gap:E-b.arr,leave:dep-WALK*6e4,wake:dep-(WALK+PREP)*6e4,backup:at(nx.dep),backupArr:at(nx.arr)};
 }
-const DEF="Type 4 digits, e.g. 1430. A short 615 reads as 06:15. The date moves on a day after each add.";
-let cur=new Date();cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate());
+let cur=day0(Date.now());
 const showDate=()=>{$("dd").textContent=dl(cur)};
-const step=n=>{cur=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+n);showDate()};
+const step=n=>{cur+=n*864e5;showDate()};
 function norm(s){s=s.replace(/[^\d:]/g,"");let h,m;
   if(s.includes(":")){const p=s.split(":");if(p.length!==2||!p[0]||p[0].length>2||p[1].length!==2)return null;h=+p[0];m=+p[1]}
   else if(s.length===3){h=+s[0];m=+s.slice(1)}else if(s.length===4){h=+s.slice(0,2);m=+s.slice(2)}else return null;
   return h>23||m>59?null:{h,m}}
 function render(){
-  const now=Date.now(),L=[...duties].sort((a,b)=>a-b),nxt=L.findIndex(t=>plan(t).dep.getTime()>now);
-  $("list").innerHTML=L.length?L.map((t,i)=>{
-    const p=plan(t),past=t<=now,r=Math.round((p.egate-p.wake)/6e4),df=x=>x.getDate()!==p.egate.getDate()?" ("+dl(x)+")":"";
-    return`<div class="card duty ${past?"past":""}"><div class="head"><span class="day">${dl(p.egate)}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
-    <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span></div>
+  const now=Date.now(),L=[...duties].sort((a,b)=>a.t-b.t),nxt=L.findIndex(d=>plan(d.t).dep>now);
+  $("list").innerHTML=L.length?L.map((d,i)=>{
+    const t=d.t,p=plan(t),df=x=>day0(x)!==day0(t)?" ("+dl(x)+")":"";
+    return`<div class="card duty"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
+    <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span><button class="al ${d.a?"on":""}" data-al="a:${t}" aria-label="${d.a?"Wake-up alarm added":"Add wake-up alarm"}" aria-pressed="${d.a}">${CLOCK}</button></div>
     <div class="steps">
-      <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b></div>
+      <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b><button class="al sm ${d.l?"on":""}" data-al="l:${t}" aria-label="${d.l?"Leave-home alarm added":"Add leave-home alarm"}" aria-pressed="${d.l}">${CLOCK}</button></div>
       <div class="step k"><span>Bus from SAFA TWR</span><b>${hm(p.dep)}</b></div>
       <div class="step"><span>Arrive EGHQ</span><b>${hm(p.arr)}</b></div>
-      <div class="step k"><span>E-gate</span><b>${hm(p.egate)}</b></div>
+      <div class="step k"><span>E-gate</span><b>${hm(t)}</b></div>
     </div>
     ${p.gap>MAXEARLY?`<div class="warn">No bus lands within ${MAXEARLY} min of e-gate. Best option arrives ${p.gap} min early.</div>`:""}
-    <div class="hint">Arrive ${p.gap} min early · wake ${Math.floor(r/60)}h${pad(r%60)} before e-gate · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>p.egate?", after e-gate":""})</div>
+    <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div>
     <div class="foot"><span></span><button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
-  :'<div class="card empty">No e-gates yet. Type your first one above.</div>';
+  :'<div class="card empty">No e-gates yet. Type one above or add your roster.</div>';
 }
-function tick(){
-  const now=Date.now(),el=$("tm");let n=null;
-  duties.forEach(t=>{const p=plan(t),e=now<p.wake?{t:+p.wake,k:"w"}:now<p.dep?{t:+p.dep,k:"b"}:null;if(e&&(!n||e.t<n.t))n=e});
+const inMin=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?"now":m<60?"in "+m+" min":"in "+Math.floor(m/60)+"h "+pad(m%60)+"m"};
+function nextBus(list,now){const d0=day0(now);return[-1,0,1].flatMap(o=>list.map(x=>({dep:d0+(o*1440+x.d)*6e4,arr:d0+(o*1440+x.d+x.dur)*6e4}))).filter(x=>x.dep>=now-3e4).sort((a,b)=>a.dep-b.dep).slice(0,2)}
+function buses(){if(!$("bus").open)return;const now=Date.now(),row=(t,L)=>`<div class="bl"><small>${t}</small><div class="br"><b>${hm(L[0].dep)}</b><span>${inMin(L[0].dep-now)} · arrives ${hm(L[0].arr)}</span></div><span class="th">Then ${hm(L[1].dep)}</span></div>`;
+  $("bx").innerHTML=row("To EGHQ · from SAFA TWR",nextBus(T,now))+row("To SAFA TWR · from EGHQ",nextBus(H,now))}
+function tick(){buses();
+  const now=Date.now(),keep=duties.filter(d=>d.t+36e5>now);
+  if(keep.length!==duties.length){duties=keep;save();render()}
+  const el=$("tm");let n=null;
+  duties.forEach(d=>{const p=plan(d.t),e=now<p.wake?{t:p.wake,k:"w"}:now<p.dep?{t:p.dep,k:"b"}:null;if(e&&(!n||e.t<n.t))n=e});
   if(!n){el.hidden=true;return}
-  el.hidden=false;const ms=n.t-now,tot=Math.floor(ms/1000),h=ms/36e5,m=ms/6e4,d=new Date(n.t);
-  const c=n.k==="w"?(h<=4?"var(--r)":h<=12?"var(--y)":h<=24?"var(--g)":"var(--mute)"):(m<=15?"var(--r)":m<=30?"var(--y)":"var(--g)");
-  $("tt").textContent=Math.floor(tot/3600)+":"+pad(Math.floor(tot%3600/60))+":"+pad(tot%60);
+  el.hidden=false;const ms=n.t-now,s=Math.floor(ms/1000),hr=ms/36e5,m=ms/6e4,dd=Math.floor(s/86400),hh=Math.floor(s%86400/3600);
+  const c=n.k==="w"?(hr<=4?"var(--r)":hr<=12?"var(--y)":hr<=24?"var(--g)":"var(--mute)"):(m<=15?"var(--r)":m<=30?"var(--y)":"var(--g)");
+  $("tt").textContent=(dd?dd+"d "+pad(hh):hh)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
   $("tl").textContent=n.k==="w"?"Next wake-up":"Bus leaves";
-  $("tw").textContent=n.k==="w"?dl(d)+" · "+hm(d):"From SAFA TWR at "+hm(d);
+  $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):"From SAFA TWR at "+hm(n.t);
   $("tt").style.color=c;el.style.borderColor=c;
 }
 function add(){
   const n=norm($("eg").value),er=$("er");
   if(!n){er.textContent="Enter a 24h time like 1430 or 6:15.";er.hidden=false;$("eg").focus();return}
-  er.hidden=true;
-  const t=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),n.h,n.m).getTime();
-  if(!duties.includes(t))duties.push(t);
-  $("eg").value="";$("rd").textContent=DEF;step(1);save();render();tick();$("eg").focus();
+  er.hidden=true;const w=W(cur);addDuty(wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate(),n.h,n.m));
+  $("eg").value="";$("rd").textContent="";step(1);save();render();tick();$("eg").focus();
 }
 $("eg").oninput=()=>{let v=$("eg").value.replace(/[^\d:]/g,"");
   if(v.includes(":")){const i=v.indexOf(":");v=(v.slice(0,i+1)+v.slice(i+1).replace(/:/g,"")).slice(0,5)}
   else{v=v.slice(0,4);if(v.length===4)v=v.slice(0,2)+":"+v.slice(2)}
-  $("eg").value=v;const n=norm(v);$("rd").textContent=n?"Reads as "+pad(n.h)+":"+pad(n.m):DEF};
-$("add").onclick=add;
-$("eg").onkeydown=e=>{if(e.key==="Enter")add()};
+  $("eg").value=v;const n=norm(v);$("rd").textContent=n?"Reads as "+pad(n.h)+":"+pad(n.m):""};
+$("add").onclick=add;$("eg").onkeydown=e=>{if(e.key==="Enter")add()};
 $("dm").onclick=()=>step(-1);$("dpl").onclick=()=>step(1);
-$("list").onclick=e=>{const x=e.target.dataset.x;if(x){duties=duties.filter(t=>t!==+x);save();render();tick()}};
+$("list").onclick=e=>{
+  const al=e.target.closest("[data-al]"),rm=e.target.closest("[data-x]");
+  if(al){const[k,v]=al.dataset.al.split(":"),d=duties.find(x=>x.t===+v);if(!d)return;
+    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=k==="a"?hm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")":hm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
+      d[k]=true;location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(txt)}
+    save();render()}
+  else if(rm){duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}};
 $("clr").onclick=()=>{if(confirm("Remove all e-gates?")){duties=[];save();render();tick()}};
-$("rd").textContent=DEF;showDate();render();tick();setInterval(()=>{tick()},1000);
+/* roster */
+const st=t=>{$("st").textContent=t;$("st").hidden=!t};
+const PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+async function loadPdf(){if(window.pdfjsLib)return;await new Promise((ok,no)=>{const s=document.createElement("script");s.src=PDFJS+"pdf.min.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+"pdf.worker.min.js"}
+async function pdfItems(f){
+  await loadPdf();const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,pages=[];
+  for(let i=1;i<=pdf.numPages;i++){const tc=await(await pdf.getPage(i)).getTextContent();
+    pages.push(tc.items.filter(x=>x.str&&x.str.trim()).map(x=>({s:x.str,x:x.transform[4],y:x.transform[5]})))}
+  return pages;
+}
+function parseRoster(pages){
+  const all=pages.flat().map(i=>i.s).join(" ").replace(/\s+/g," "),h=all.match(/(\d{1,2})-(\d{1,2})-(\d{4}) to/);
+  if(!h)return null;if(!/times are in local/i.test(all))return{error:"This roster isn't in local times, so it can't be read safely."};
+  const sd=+h[1],sm=+h[2]-1,sy=+h[3],out=[],DAY=/^(\d{2}) (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,FL=/(\d{2}:\d{2}) (\d{1,4}) ([A-Z]{3}) (\d{2}:\d{2}) ([A-Z]{3}) (\d{2}:\d{2})/g;let last=null;
+  pages.forEach(items=>{
+    const lines=[];items.slice().sort((a,b)=>b.y-a.y).forEach(it=>{const l=lines.find(l=>Math.abs(l.y-it.y)<2);l?l.it.push(it):lines.push({y:it.y,it:[it]})});
+    lines.forEach(l=>{l.t=l.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(" ").replace(/\s+/g," ").trim()});
+    const dates=lines.map(l=>{const m=l.t.match(DAY);return m?{y:l.y,d:+m[1]}:null}).filter(Boolean);
+    lines.forEach(l=>{let m;FL.lastIndex=0;while((m=FL.exec(l.t))){
+      let b=null;dates.forEach(d=>{const dist=Math.abs(d.y-l.y);if(!b||dist<b.dist-1||(Math.abs(dist-b.dist)<=1&&d.y>b.y))b={y:d.y,d:d.d,dist}});
+      const day=b?b.d:last;if(day==null||m[3]!=="DXB")continue;
+      const[H,M]=m[4].split(":").map(Number);out.push({t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2]})}});
+    if(dates.length)last=dates[dates.length-1].d});
+  return out;
+}
+$("up").onclick=()=>$("fl").click();
+$("fl").onchange=async()=>{
+  const f=$("fl").files[0];$("fl").value="";if(!f)return;
+  if(f.type!=="application/pdf"&&!/\.pdf$/i.test(f.name)){st("Please upload the roster PDF.");return}
+  $("up").disabled=true;st("Reading your roster…");
+  try{const r=parseRoster(await pdfItems(f));
+    if(r===null)st("This doesn't look like your My Roster PDF.");
+    else if(r.error)st(r.error);
+    else if(!r.length)st("No flights from DXB found in this roster.");
+    else{r.forEach(x=>addDuty(x.t,x.f));save();render();tick();st(`Added ${r.length} flight${r.length>1?"s":""} from DXB. Check the e-gates against your roster.`)}}
+  catch(e){st("Couldn't open that PDF. The first upload needs an internet connection.")}
+  $("up").disabled=false;
+};
+try{$("bus").open=localStorage.getItem("egbus")==="1"}catch(e){}
+$("bus").ontoggle=()=>{try{localStorage.setItem("egbus",$("bus").open?"1":"")}catch(e){}buses()};
+showDate();render();tick();setInterval(tick,1000);
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 </script></body></html>

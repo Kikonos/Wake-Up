@@ -1,6 +1,6 @@
 {
- "name": "E-Gate Planner",
- "short_name": "E-Gate",
+ "name": "Wake Up",
+ "short_name": "Wake Up",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
