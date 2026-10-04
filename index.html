@@ -61,7 +61,6 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
 .br{display:flex;align-items:baseline;gap:10px}.br b{font-size:28px;font-variant-numeric:tabular-nums}.br span,.th{color:var(--mute);font-size:13px}
 .al{background:none;padding:4px;color:var(--mute);opacity:.45;line-height:0}.al.on{color:var(--acc);opacity:1}.al.on svg{stroke-width:2.5}
 .sv{display:flex;align-items:center;gap:6px}.al.sm svg{width:20px;height:20px}
-.duty .step{padding-right:38px}.step .al{position:absolute;right:5px;top:50%;transform:translateY(-50%)}
 </style></head><body><main>
 <h1>E-Gate Planner</h1>
 <p class="sub">Upload your roster. Get your bus and wake-up time.</p>
@@ -74,7 +73,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   <details><summary>Details</summary><div class="dtx">
     <p>Upload your My Roster PDF. The app reads it on your phone, finds every flight leaving DXB and sets each e-gate 2h30 before departure. Check them against your roster the first few times. The first upload needs an internet connection.</p>
     <p>Typing: 4 digits, e.g. 1430. A short 615 reads as 06:15. The date moves on a day after each add.</p>
-    <p>Alarms: tap the clock next to the wake-up time or the leave-home time to add that alarm through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
+    <p>Alarms: tap the clock next to the wake-up time to add both the wake-up and leave-home alarms through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
     <p>All times are Dubai time (GMT+4). Duties disappear 1 hour after e-gate.</p>
   </div></details>
 </div>
@@ -88,7 +87,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
 </div></details>
 <div class="foot"><button class="ghost" id="clr">Clear all</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.11 Aligned</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.13 Alarms</p>
 </main>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -123,9 +122,9 @@ function render(){
   $("list").innerHTML=L.length?L.map((d,i)=>{
     const t=d.t,p=plan(t),df=x=>day0(x)!==day0(t)?" ("+dl(x)+")":"";
     return`<div class="card duty"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
-    <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span><button class="al ${d.a?"on":""}" data-al="a:${t}" aria-label="${d.a?"Wake-up alarm added":"Add wake-up alarm"}" aria-pressed="${d.a}">${CLOCK}</button></div>
+    <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span><button class="al ${d.a?"on":""}" data-al="a:${t}" aria-label="${d.a?"Alarms added":"Add wake-up and leave-home alarms"}" aria-pressed="${d.a}">${CLOCK}</button></div>
     <div class="steps">
-      <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b><button class="al sm ${d.l?"on":""}" data-al="l:${t}" aria-label="${d.l?"Leave-home alarm added":"Add leave-home alarm"}" aria-pressed="${d.l}">${CLOCK}</button></div>
+      <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b></div>
       <div class="step k"><span>Bus from SAFA TWR</span><b>${hm(p.dep)}</b></div>
       <div class="step"><span>Arrive EGHQ</span><b>${hm(p.arr)}</b></div>
       <div class="step k"><span>E-gate</span><b>${hm(t)}</b></div>
@@ -167,7 +166,7 @@ $("dm").onclick=()=>step(-1);$("dpl").onclick=()=>step(1);
 $("list").onclick=e=>{
   const al=e.target.closest("[data-al]"),rm=e.target.closest("[data-x]");
   if(al){const[k,v]=al.dataset.al.split(":"),d=duties.find(x=>x.t===+v);if(!d)return;
-    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=k==="a"?hm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")":hm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
+    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=hm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")\n"+hm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
       d[k]=true;location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(txt)}
     save();render()}
   else if(rm){duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}};
