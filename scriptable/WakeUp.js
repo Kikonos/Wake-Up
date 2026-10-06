@@ -37,14 +37,19 @@ function outline(x, y, w, h, r) {
   pts.push([x + w / 2, y]);
   return pts;
 }
-function stroke(ctx, pts, frac, color, width) {
+// Strokes the outline from fraction a to b of the way round.
+function stroke(ctx, pts, a, b, color, width) {
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  let want = total * frac;
-  const p = new Path(); p.move(new Point(...pts[0]));
-  for (let i = 1; i < pts.length && want > 0; i++) {
-    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], seg = Math.hypot(bx - ax, by - ay), k = Math.min(1, want / seg);
-    p.addLine(new Point(ax + (bx - ax) * k, ay + (by - ay) * k)); want -= seg;
+  const from = total * a, to = total * b, p = new Path(), at = (i, k) => new Point(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k);
+  let pos = 0, started = false;
+  for (let i = 1; i < pts.length && pos < to; i++) {
+    const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]), end = pos + seg;
+    if (end > from) {
+      if (!started) { p.move(at(i, Math.max(0, (from - pos) / seg))); started = true }
+      p.addLine(at(i, Math.min(1, (to - pos) / seg)));
+    }
+    pos = end;
   }
   ctx.addPath(p); ctx.setStrokeColor(color); ctx.setLineWidth(width); ctx.strokePath();
 }
@@ -54,8 +59,9 @@ function ring(family, st) {
   const ctx = new DrawContext();
   ctx.size = new Size(w, h); ctx.opaque = false; ctx.respectScreenScale = false;
   const pts = outline(inset, inset, w - 2 * inset, h - 2 * inset, rad), hex = RING.get(st.col);
-  stroke(ctx, pts, 1, new Color("#8b93a3", 0.22), lw);
-  if (st.left > 0) stroke(ctx, pts, st.left, new Color(hex), lw);
+  stroke(ctx, pts, 0, 1, new Color("#8b93a3", 0.22), lw);
+  // The empty part grows clockwise from the top, so the bar drains clockwise.
+  if (st.left > 0) stroke(ctx, pts, 1 - st.left, 1, new Color(hex), lw);
   return ctx.getImage();
 }
 function text(s, s0, font, color, op) {
