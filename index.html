@@ -61,6 +61,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
 .br{display:flex;align-items:baseline;gap:10px}.br b{font-size:28px;font-variant-numeric:tabular-nums}.br span,.th{color:var(--mute);font-size:13px}
 .al{background:none;padding:4px;color:var(--mute);opacity:.45;line-height:0}.al.on{color:var(--acc);opacity:1}.al.on svg{stroke-width:2.5}
 .sv{display:flex;align-items:center;gap:6px}.al.sm svg{width:20px;height:20px}
+#wg.stale{color:var(--acc)}#wg.stale:after{content:" •"}#cps{margin-top:10px}
 </style></head><body><main>
 <h1>E-Gate Planner</h1>
 <p class="sub">Upload your roster. Get your bus and wake-up time.</p>
@@ -74,6 +75,8 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
     <p>Upload your My Roster PDF. The app reads it on your phone, finds every flight leaving DXB and sets each e-gate 2h30 before departure. Check them against your roster the first few times. The first upload needs an internet connection.</p>
     <p>Typing: 4 digits, e.g. 1430. A short 615 reads as 06:15. The date moves on a day after each add.</p>
     <p>Alarms: tap the clock next to the wake-up time to add both the wake-up and leave-home alarms through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
+    <p>Lock Screen widget: install the free Scriptable app, create a script named WakeUp and paste in the widget script (copy it below). Add a Scriptable widget to your Lock Screen and choose WakeUp. Tap Update widget at the bottom after each roster upload or change. It shows a live countdown to your next wake-up, then to your bus.</p>
+    <button class="sec2" id="cps">Copy widget script</button>
     <p>All times are Dubai time (GMT+4). Duties disappear 1 hour after e-gate.</p>
   </div></details>
 </div>
@@ -86,8 +89,8 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   <div class="row"><input id="eg" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off"><button id="add">Add</button></div>
   <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
 </div></details>
-<div class="foot"><button class="ghost" id="clr">Clear all</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.13 Alarms</p>
+<div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.14 Widget</p>
 </main>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -99,8 +102,9 @@ const hm=x=>{const d=W(+x);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes()
 const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
-let duties=[];
+let duties=[],sent=[];
 try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:+d.t,f:d.f||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
+try{sent=JSON.parse(localStorage.getItem("egw")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
 function addDuty(t,f){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f}else duties.push({t,f:f||"",a:false,l:false})}
 function plan(eg){
@@ -133,6 +137,16 @@ function render(){
     <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div>
     <div class="foot"><span></span><button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
   :'<div class="card empty">No e-gates yet. Type one above or add your roster.</div>';
+  widgetState();
+}
+/* Scriptable widget */
+const WIDGET="WakeUp",keys=L=>L.map(d=>d.t+(d.f||"")).sort().join(),live=L=>L.filter(d=>d.t+36e5>Date.now());
+function widgetState(){$("wg").hidden=!duties.length&&!live(sent).length;$("wg").classList.toggle("stale",keys(live(duties))!==keys(live(sent)))}
+function sendWidget(){
+  const now=Date.now(),L=duties.map(d=>({d,p:plan(d.t)})).filter(x=>x.p.dep>now).sort((a,b)=>a.d.t-b.d.t)
+    .map(({d,p})=>({e:d.t,w:p.wake,b:p.dep,f:d.f,es:hm(d.t),ws:hm(p.wake),bs:hm(p.dep),dl:dl(p.wake)}));
+  sent=duties.map(d=>({t:d.t,f:d.f}));try{localStorage.setItem("egw",JSON.stringify(sent))}catch(e){}
+  widgetState();location.href="scriptable:///run/"+WIDGET+"?d="+encodeURIComponent(JSON.stringify(L));
 }
 const inMin=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?"now":m<60?"in "+m+" min":"in "+Math.floor(m/60)+"h "+pad(m%60)+"m"};
 function nextBus(list,now){const d0=day0(now);return[-1,0,1].flatMap(o=>list.map(x=>({dep:d0+(o*1440+x.d)*6e4,arr:d0+(o*1440+x.d+x.dur)*6e4}))).filter(x=>x.dep>=now-3e4).sort((a,b)=>a.dep-b.dep).slice(0,2)}
@@ -170,6 +184,10 @@ $("list").onclick=e=>{
       d[k]=true;location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(txt)}
     save();render()}
   else if(rm){duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}};
+$("wg").onclick=sendWidget;
+$("cps").onclick=async()=>{const b=$("cps"),done=t=>{b.textContent=t;setTimeout(()=>b.textContent="Copy widget script",2500)},src=()=>fetch("scriptable/WakeUp.js").then(r=>{if(!r.ok)throw 0;return r.text()});
+  try{if(window.ClipboardItem)await navigator.clipboard.write([new ClipboardItem({"text/plain":src().then(t=>new Blob([t],{type:"text/plain"}))})]);else await navigator.clipboard.writeText(await src());done("Copied. Paste it into Scriptable.")}
+  catch(e){done("Couldn't copy. Open scriptable/WakeUp.js instead.")}};
 $("clr").onclick=()=>{if(confirm("Remove all e-gates?")){duties=[];save();render();tick()}};
 /* roster */
 const st=t=>{$("st").textContent=t;$("st").hidden=!t};
