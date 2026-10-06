@@ -7,6 +7,8 @@ const q = args.queryParameters || {};
 const C = (l, d) => Color.dynamic(new Color(l), new Color(d));
 const BG = C("#ffffff", "#171a22"), INK = C("#12141a", "#eef0f4"), MUTE = C("#6b7280", "#8b93a3");
 const G = C("#16a34a", "#22c55e"), Y = C("#ca8a04", "#eab308"), R = C("#dc2626", "#ef4444");
+// The ring is a drawn image, so it takes fixed colours that read in light and dark.
+const RING = new Map([[MUTE, "#8b93a3"], [G, "#22c55e"], [Y, "#eab308"], [R, "#ef4444"]]);
 
 function load() {
   try { return JSON.parse(Keychain.contains(KEY) ? Keychain.get(KEY) : "[]") } catch (e) { return [] }
@@ -21,7 +23,40 @@ function state(d, now) {
   const steps = wake ? [[DAY, G], [12 * H, Y], [4 * H, R]] : [[30 * 6e4, Y], [15 * 6e4, R]];
   let col = wake ? MUTE : G, change = t;
   for (const [lim, c] of steps) if (ms <= lim) col = c; else change = Math.min(change, t - lim);
-  return { wake, t, col, refresh: new Date(change + 1000) };
+  // Ring: remaining share of the last 24h before wake-up, then of wake-up to bus.
+  const span = wake ? DAY : Math.max(d.b - d.w, 6e4), left = Math.min(1, Math.max(0, ms / span));
+  return { wake, t, col, left, refresh: new Date(change + 1000) };
+}
+// Points along a rounded rectangle, clockwise from top centre.
+function outline(x, y, w, h, r) {
+  const pts = [[x + w / 2, y]], arc = (cx, cy, a0) => {
+    for (let i = 0; i <= 16; i++) { const a = a0 + i / 16 * Math.PI / 2; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]) }
+  };
+  arc(x + w - r, y + r, -Math.PI / 2); arc(x + w - r, y + h - r, 0);
+  arc(x + r, y + h - r, Math.PI / 2); arc(x + r, y + r, Math.PI);
+  pts.push([x + w / 2, y]);
+  return pts;
+}
+function stroke(ctx, pts, frac, color, width) {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  let want = total * frac;
+  const p = new Path(); p.move(new Point(...pts[0]));
+  for (let i = 1; i < pts.length && want > 0; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], seg = Math.hypot(bx - ax, by - ay), k = Math.min(1, want / seg);
+    p.addLine(new Point(ax + (bx - ax) * k, ay + (by - ay) * k)); want -= seg;
+  }
+  ctx.addPath(p); ctx.setStrokeColor(color); ctx.setLineWidth(width); ctx.strokePath();
+}
+// Progress ring hugging the widget's rounded corners.
+function ring(family, st) {
+  const S = 3, h = (family === "systemLarge" ? 382 : 170) * S, w = (family === "systemSmall" ? 170 : 364) * S, lw = 5 * S, inset = 3 * S + lw / 2, rad = 22 * S - inset;
+  const ctx = new DrawContext();
+  ctx.size = new Size(w, h); ctx.opaque = false; ctx.respectScreenScale = false;
+  const pts = outline(inset, inset, w - 2 * inset, h - 2 * inset, rad), hex = RING.get(st.col);
+  stroke(ctx, pts, 1, new Color("#8b93a3", 0.22), lw);
+  if (st.left > 0) stroke(ctx, pts, st.left, new Color(hex), lw);
+  return ctx.getImage();
 }
 function text(s, s0, font, color, op) {
   const t = s0.addText(s);
@@ -52,7 +87,7 @@ function rows(s0, d, st, now, size) {
 }
 function home(family, d, now) {
   const w = new ListWidget();
-  w.backgroundColor = BG; w.setPadding(14, 14, 14, 14);
+  w.backgroundColor = BG; w.setPadding(16, 16, 16, 16);
   if (!d) {
     text("WAKE UP", w, Font.boldSystemFont(11), MUTE);
     w.addSpacer();
@@ -63,7 +98,9 @@ function home(family, d, now) {
     return w;
   }
   const st = state(d, now), medium = family === "systemMedium" || family === "systemLarge";
-  w.refreshAfterDate = st.refresh;
+  w.backgroundImage = ring(family, st);
+  // Redraw now and then so the ring moves; iOS decides how often it really does.
+  w.refreshAfterDate = new Date(Math.min(+st.refresh, now + (st.wake ? 15 : 2) * 6e4));
   const head = (s0) => {
     const h = s0.addStack(); h.centerAlignContent();
     text(st.wake ? "NEXT WAKE-UP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
