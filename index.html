@@ -72,7 +72,8 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   <input type="file" id="fl" accept="application/pdf,.pdf" hidden>
   <p class="hint" id="st" hidden></p>
   <details><summary>Details</summary><div class="dtx">
-    <p>Upload your My Roster PDF. The app reads it on your phone, finds every flight leaving DXB and sets each e-gate 2h30 before departure. Check them against your roster the first few times. The first upload needs an internet connection.</p>
+    <p>Upload your My Roster PDF. The app reads it on your phone, finds every flight leaving DXB and sets each e-gate 2h30 before departure. Check them against your roster the first few times.</p>
+    <p>Offline: everything works without internet once the app has been opened online, including roster upload. When you're back online it picks up any update by itself.</p>
     <p>Typing: 4 digits, e.g. 1430. A short 615 reads as 06:15. The date moves on a day after each add.</p>
     <p>Alarms: tap the clock next to the wake-up time to add both the wake-up and leave-home alarms through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
     <p>Lock Screen widget: install the free Scriptable app, create a script named WakeUp and paste in the widget script (copy it below). Add a Scriptable widget to your Lock Screen and choose WakeUp. Tap Update widget at the bottom after each roster upload or change. It shows a live countdown to your next wake-up, then to your bus.</p>
@@ -90,7 +91,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
 </div></details>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.20 Widget</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.21 Offline</p>
 </main>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -224,11 +225,16 @@ $("fl").onchange=async()=>{
     else if(r.error)st(r.error);
     else if(!r.length)st("No flights from DXB found in this roster.");
     else{r.forEach(x=>addDuty(x.t,x.f));save();render();tick();st(`Added ${r.length} flight${r.length>1?"s":""} from DXB. Check the e-gates against your roster.`)}}
-  catch(e){st("Couldn't open that PDF. The first upload needs an internet connection.")}
+  catch(e){st(navigator.onLine?"Couldn't open that PDF.":"Couldn't open that PDF offline. Open the app once with internet, then try again.")}
   $("up").disabled=false;
 };
 try{$("bus").open=localStorage.getItem("egbus")==="1"}catch(e){}
 $("bus").ontoggle=()=>{try{localStorage.setItem("egbus",$("bus").open?"1":"")}catch(e){}buses()};
 showDate();render();tick();setInterval(tick,1000);
-if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if("serviceWorker"in navigator&&location.protocol.startsWith("http")){
+  // Check for a new version when the connection comes back or the app is reopened, and switch to it.
+  const sw=navigator.serviceWorker;let had=!!sw.controller;
+  sw.addEventListener("controllerchange",()=>{if(had)location.reload();had=true});
+  sw.register("./sw.js").then(reg=>{const up=()=>reg.update().catch(()=>{});addEventListener("online",up);document.addEventListener("visibilitychange",()=>{if(!document.hidden)up()})}).catch(()=>{});
+}
 </script></body></html>
