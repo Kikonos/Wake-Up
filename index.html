@@ -18,9 +18,9 @@
 :root[data-theme="dark"]{--bg:#0d0f14;--card:#171a22;--ink:#eef0f4;--mute:#8b93a3;--line:#262b36;--acc:#6f7bcc;--accbg:#1f2340;--warn:#fb923c;--g:#22c55e;--y:#eab308;--r:#ef4444}
 /* The page scrolls inside #sc so it can't zoom or move sideways, and so its scroll bar can be drawn by #sb. */
 html,body{height:100%;overflow:hidden;overscroll-behavior:none}
-#sc{position:fixed;inset:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:none;touch-action:pan-y;scrollbar-width:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#sc{position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:none;touch-action:pan-y;scrollbar-width:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
 #sc::-webkit-scrollbar{display:none}
-#sb{position:fixed;right:2px;top:0;width:3px;border-radius:2px;background:var(--sbc,var(--acc));opacity:0;transition:opacity .5s;pointer-events:none;z-index:5}
+#sb{position:fixed;right:2px;top:0;width:3px;height:36px;border-radius:2px;background:var(--sbc,var(--acc));opacity:0;transition:opacity .5s;pointer-events:none;z-index:5}
 #sb.on{opacity:.85;transition:opacity .1s}
 button{touch-action:manipulation}
 *{box-sizing:border-box}
@@ -51,6 +51,7 @@ button.ghost{background:transparent;color:var(--mute);font-weight:500;padding:6p
 .step.k:before{background:var(--acc)}.step b{font-variant-numeric:tabular-nums}
 .warn{color:var(--warn);font-size:13px;margin-top:8px}
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.duty .foot button.ghost{padding:6px 0 0 12px}
 .empty{text-align:center;color:var(--mute);padding:28px 10px}
 
 .tm b{font-size:30px;white-space:nowrap}
@@ -98,7 +99,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.22</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.23</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -171,7 +172,7 @@ function tick(){buses();
   $("tt").textContent=(dd?dd+"d "+pad(hh):hh)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
   $("tl").textContent=n.k==="w"?"Next wake-up":"Bus leaves";
   $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):"From SAFA TWR at "+hm(n.t);
-  $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c);
+  $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c==="var(--mute)"?"var(--acc)":c);
 }
 function add(){
   const n=norm($("eg").value),er=$("er");
@@ -248,11 +249,16 @@ const sc=$("sc"),sb=$("sb");let sbT;
 function sbar(){
   const cs=getComputedStyle(sc),top=parseFloat(cs.paddingTop)+4,track=sc.clientHeight-top-parseFloat(cs.paddingBottom)-8,max=sc.scrollHeight-sc.clientHeight;
   if(max<2||track<40){sb.classList.remove("on");return}
-  const len=Math.max(28,track*sc.clientHeight/sc.scrollHeight),y=top+(track-len)*Math.min(1,Math.max(0,sc.scrollTop/max));
-  sb.style.height=len+"px";sb.style.transform=`translateY(${y}px)`;sb.classList.add("on");
+  const y=top+(track-sb.offsetHeight)*Math.min(1,Math.max(0,sc.scrollTop/max));
+  sb.style.transform=`translateY(${y}px)`;sb.classList.add("on");
   clearTimeout(sbT);sbT=setTimeout(()=>sb.classList.remove("on"),900);
 }
 sc.addEventListener("scroll",sbar,{passive:true});
+// iOS 26 home-screen apps can report a viewport that stops short of the bottom of the screen,
+// which left a solid band under the page. Fill the screen whatever the viewport says.
+function fit(){const portrait=matchMedia("(orientation: portrait)").matches,full=navigator.standalone?(portrait?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height)):0;
+  sc.style.height=Math.max(innerHeight,full)+"px"}
+fit();addEventListener("resize",fit);addEventListener("orientationchange",()=>setTimeout(fit,300));
 /* no pinch zoom: iOS ignores user-scalable=no, so cancel its gesture events too */
 ["gesturestart","gesturechange","gestureend"].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
 document.addEventListener("touchmove",e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
