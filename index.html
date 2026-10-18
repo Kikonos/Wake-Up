@@ -16,11 +16,13 @@
 :root{--bg:#f4f5f7;--card:#fff;--ink:#12141a;--mute:#6b7280;--line:#e3e5ea;--acc:#5763be;--accbg:#e8eaf8;--warn:#c2410c;--g:#16a34a;--y:#ca8a04;--r:#dc2626}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0f14;--card:#171a22;--ink:#eef0f4;--mute:#8b93a3;--line:#262b36;--acc:#6f7bcc;--accbg:#1f2340;--warn:#fb923c;--g:#22c55e;--y:#eab308;--r:#ef4444}}
 :root[data-theme="dark"]{--bg:#0d0f14;--card:#171a22;--ink:#eef0f4;--mute:#8b93a3;--line:#262b36;--acc:#6f7bcc;--accbg:#1f2340;--warn:#fb923c;--g:#22c55e;--y:#eab308;--r:#ef4444}
-/* The page scrolls inside #sc so it can't zoom or move sideways, and so its scroll bar can be drawn by #sb. */
-html,body{height:100%;overflow:hidden;overscroll-behavior:none}
-#sc{position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:none;touch-action:pan-y;scrollbar-width:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
-#sc::-webkit-scrollbar{display:none}
-#sb{position:fixed;right:2px;top:0;width:3px;height:36px;border-radius:2px;background:var(--sbc,var(--acc));opacity:0;transition:opacity .5s;pointer-events:none;z-index:5}
+/* The page itself scrolls (an inner scroller stops short of the screen bottom on iOS), locked to vertical
+   movement. Its own scroll bar is hidden and #sb is drawn in the countdown colour instead. */
+html{overflow-x:hidden;overscroll-behavior-x:none;touch-action:pan-y;scrollbar-width:none}
+html::-webkit-scrollbar{display:none}
+body{overflow-x:hidden}
+#sc{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#sb{position:fixed;right:2px;top:0;width:3px;border-radius:2px;background:var(--sbc,var(--acc));opacity:0;transition:opacity .5s;pointer-events:none;z-index:5}
 #sb.on{opacity:.85;transition:opacity .1s}
 button{touch-action:manipulation}
 *{box-sizing:border-box}
@@ -99,7 +101,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.23</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.24</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -112,7 +114,7 @@ const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",mont
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
 let duties=[],sent=[];
-try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:+d.t,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
+try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:Math.round(d.t/6e4)*6e4,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
 try{sent=JSON.parse(localStorage.getItem("egw")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
 function addDuty(t,f,sec){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push({t,f:f||"",s:sec||"",a:false,l:false})}
@@ -172,7 +174,7 @@ function tick(){buses();
   $("tt").textContent=(dd?dd+"d "+pad(hh):hh)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
   $("tl").textContent=n.k==="w"?"Next wake-up":"Bus leaves";
   $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):"From SAFA TWR at "+hm(n.t);
-  $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c==="var(--mute)"?"var(--acc)":c);
+  $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c);
 }
 function add(){
   const n=norm($("eg").value),er=$("er");
@@ -247,18 +249,13 @@ $("bus").ontoggle=()=>{try{localStorage.setItem("egbus",$("bus").open?"1":"")}ca
 /* scroll bar */
 const sc=$("sc"),sb=$("sb");let sbT;
 function sbar(){
-  const cs=getComputedStyle(sc),top=parseFloat(cs.paddingTop)+4,track=sc.clientHeight-top-parseFloat(cs.paddingBottom)-8,max=sc.scrollHeight-sc.clientHeight;
+  const cs=getComputedStyle(sc),de=document.documentElement,h=innerHeight,top=parseFloat(cs.paddingTop)+4,track=h-top-parseFloat(cs.paddingBottom)-8,max=de.scrollHeight-h;
   if(max<2||track<40){sb.classList.remove("on");return}
-  const y=top+(track-sb.offsetHeight)*Math.min(1,Math.max(0,sc.scrollTop/max));
-  sb.style.transform=`translateY(${y}px)`;sb.classList.add("on");
+  const len=Math.max(28,track*h/de.scrollHeight),y=top+(track-len)*Math.min(1,Math.max(0,scrollY/max));
+  sb.style.height=len+"px";sb.style.transform=`translateY(${y}px)`;sb.classList.add("on");
   clearTimeout(sbT);sbT=setTimeout(()=>sb.classList.remove("on"),900);
 }
-sc.addEventListener("scroll",sbar,{passive:true});
-// iOS 26 home-screen apps can report a viewport that stops short of the bottom of the screen,
-// which left a solid band under the page. Fill the screen whatever the viewport says.
-function fit(){const portrait=matchMedia("(orientation: portrait)").matches,full=navigator.standalone?(portrait?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height)):0;
-  sc.style.height=Math.max(innerHeight,full)+"px"}
-fit();addEventListener("resize",fit);addEventListener("orientationchange",()=>setTimeout(fit,300));
+addEventListener("scroll",sbar,{passive:true});
 /* no pinch zoom: iOS ignores user-scalable=no, so cancel its gesture events too */
 ["gesturestart","gesturechange","gestureend"].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
 document.addEventListener("touchmove",e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
