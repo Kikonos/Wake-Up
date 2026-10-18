@@ -1,4 +1,4 @@
-// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.22).
+// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.25).
 // In Scriptable, create a script named exactly "WakeUp" and paste this in.
 // The planner sends your duties with its "Update widget" button.
 const KEY = "wakeup.duties", H = 36e5, DAY = 24 * H;
@@ -105,16 +105,13 @@ function lock(family, d, now) {
     return w;
   }
   if (family === "accessoryCircular") {
+    // Just a number and a unit: days, then hours under a day, then minutes under an hour.
+    // Rounded down, so 4 days 6 hours reads "4 days". iOS tints Lock Screen widgets, so no colours here.
     w.addAccessoryWidgetBackground = true;
-    const c = (s, f) => text(s, w, f).centerAlignText();
-    c(st.wake ? "WAKE" : "BUS", Font.boldSystemFont(10));
-    if (far) {
-      c(`${Math.floor((st.t - now) / DAY)}d`, Font.boldRoundedSystemFont(22));
-      c(`${Math.floor((st.t - now) % DAY / H)}h`, Font.semiboldSystemFont(12));
-    } else {
-      const t = timer(w, st, now, d, 15); t.centerAlignText();
-      c(st.wake ? d.ws : d.bs, Font.semiboldSystemFont(11));
-    }
+    const ms = st.t - now, [n, unit, step] = ms >= DAY ? [Math.floor(ms / DAY), "day", DAY] : ms >= H ? [Math.floor(ms / H), "hour", H] : [Math.max(1, Math.floor(ms / 6e4)), "min", 6e4];
+    text(String(n), w, Font.semiboldRoundedSystemFont(24)).centerAlignText();
+    text(unit === "min" ? "min" : unit + (n === 1 ? "" : "s"), w, Font.mediumSystemFont(11)).centerAlignText();
+    w.refreshAfterDate = new Date(Math.min(+st.refresh, now + (ms % step || step) + 1000));
     return w;
   }
   text(st.wake ? `Wake up ${d.ws}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));

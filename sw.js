@@ -1,4 +1,4 @@
-const C="egate-v15",PDF="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/",WAIT=3000,
+const C="egate-v16",PDF="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/",WAIT=3000,
 F=["./","index.html","manifest.webmanifest","scriptable/WakeUp.js","icon-180.png","icon-192.png","icon-512.png"],X=[PDF+"pdf.min.js",PDF+"pdf.worker.min.js"];
 // The PDF reader is saved too so roster upload works offline; if the CDN is down the app still installs.
 self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F).then(()=>c.addAll(X).catch(()=>{}))));self.skipWaiting()});
