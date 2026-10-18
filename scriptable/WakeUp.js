@@ -1,4 +1,4 @@
-// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner.
+// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.22).
 // In Scriptable, create a script named exactly "WakeUp" and paste this in.
 // The planner sends your duties with its "Update widget" button.
 const KEY = "wakeup.duties", H = 36e5, DAY = 24 * H;
@@ -21,8 +21,13 @@ function state(d, now) {
   const steps = wake ? [[DAY, G], [12 * H, Y], [4 * H, R]] : [[30 * 6e4, Y], [15 * 6e4, R]];
   let col = wake ? MUTE : G, change = t;
   for (const [lim, c] of steps) if (ms <= lim) col = c; else change = Math.min(change, t - lim);
+  // Over a day out the widget shows "4d 6h", so it also redraws when the hour changes.
+  if (ms > DAY) change = Math.min(change, now + ms % H);
   return { wake, t, col, refresh: new Date(change + 1000) };
 }
+// Time left as "4d 6h", rounded down like the planner's countdown.
+const left = ms => `${Math.floor(ms / DAY)}d ${Math.floor(ms % DAY / H)}h`;
+const flight = d => [d.f, d.s].filter(Boolean).join(" ");
 function text(s, s0, font, color, op) {
   const t = s0.addText(s);
   t.font = font; t.lineLimit = 1; t.minimumScaleFactor = 0.6;
@@ -31,7 +36,7 @@ function text(s, s0, font, color, op) {
   return t;
 }
 function timer(s0, st, now, d, size) {
-  if (st.t - now > DAY) return text(d.dl, s0, Font.boldSystemFont(size * 0.75), st.col);
+  if (st.t - now > DAY) return text(left(st.t - now), s0, Font.boldMonospacedSystemFont(size), st.col);
   const c = s0.addDate(new Date(st.t));
   c.applyTimerStyle();
   c.font = Font.boldMonospacedSystemFont(size); c.textColor = st.col;
@@ -68,8 +73,8 @@ function home(family, d, now) {
     const h = s0.addStack(); h.centerAlignContent();
     text(st.wake ? "NEXT WAKE-UP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
     h.addSpacer();
-    // The small widget only has room for the flight number.
-    const info = medium ? d.dl + (d.f ? " · " + d.f : "") : d.f || "";
+    // The small widget only has room for the date or the flight.
+    const info = medium ? [d.dl, flight(d)].filter(Boolean).join(" · ") : st.t - now > DAY ? d.dl : d.f || "";
     if (info) text(info, h, Font.mediumSystemFont(11), MUTE);
   };
   if (medium) {
@@ -94,13 +99,27 @@ function lock(family, d, now) {
   if (!d) { text("No e-gates", w, Font.semiboldSystemFont(13)); w.refreshAfterDate = new Date(now + 6 * H); return w }
   const st = state(d, now);
   w.refreshAfterDate = st.refresh;
+  const far = st.t - now > DAY;
   if (family === "accessoryInline") {
-    text(st.wake ? `⏰ ${d.ws} · bus ${d.bs}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
+    text(st.wake ? `⏰ ${d.ws} · ${far ? "in " + left(st.t - now) : "bus " + d.bs}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
+    return w;
+  }
+  if (family === "accessoryCircular") {
+    w.addAccessoryWidgetBackground = true;
+    const c = (s, f) => text(s, w, f).centerAlignText();
+    c(st.wake ? "WAKE" : "BUS", Font.boldSystemFont(10));
+    if (far) {
+      c(`${Math.floor((st.t - now) / DAY)}d`, Font.boldRoundedSystemFont(22));
+      c(`${Math.floor((st.t - now) % DAY / H)}h`, Font.semiboldSystemFont(12));
+    } else {
+      const t = timer(w, st, now, d, 15); t.centerAlignText();
+      c(st.wake ? d.ws : d.bs, Font.semiboldSystemFont(11));
+    }
     return w;
   }
   text(st.wake ? `Wake up ${d.ws}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
   timer(w, st, now, d, 22);
-  text(st.wake ? `Bus ${d.bs} · e-gate ${d.es}` : `E-gate ${d.es}${d.f ? " · " + d.f : ""}`, w, Font.systemFont(12), null, 0.75);
+  text(st.wake ? (far ? `${d.dl} · bus ${d.bs}` : `Bus ${d.bs} · e-gate ${d.es}`) : `E-gate ${d.es}${flight(d) ? " · " + flight(d) : ""}`, w, Font.systemFont(12), null, 0.75);
   return w;
 }
 function build(family) {

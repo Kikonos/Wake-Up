@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>E-Gate Planner</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -13,12 +13,18 @@
 <link rel="manifest" href="manifest.webmanifest">
 
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f5f7;--card:#fff;--ink:#12141a;--mute:#6b7280;--line:#e3e5ea;--acc:#5763be;--accbg:#e8eaf8;--warn:#c2410c;--g:#16a34a;--y:#ca8a04;--r:#dc2626}
+:root{--bg:#f4f5f7;--card:#fff;--ink:#12141a;--mute:#6b7280;--line:#e3e5ea;--acc:#5763be;--accbg:#e8eaf8;--warn:#c2410c;--g:#16a34a;--y:#ca8a04;--r:#dc2626}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0f14;--card:#171a22;--ink:#eef0f4;--mute:#8b93a3;--line:#262b36;--acc:#6f7bcc;--accbg:#1f2340;--warn:#fb923c;--g:#22c55e;--y:#eab308;--r:#ef4444}}
 :root[data-theme="dark"]{--bg:#0d0f14;--card:#171a22;--ink:#eef0f4;--mute:#8b93a3;--line:#262b36;--acc:#6f7bcc;--accbg:#1f2340;--warn:#fb923c;--g:#22c55e;--y:#eab308;--r:#ef4444}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+/* The page scrolls inside #sc so it can't zoom or move sideways, and so its scroll bar can be drawn by #sb. */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+#sc{position:fixed;inset:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:none;touch-action:pan-y;scrollbar-width:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+#sc::-webkit-scrollbar{display:none}
+#sb{position:fixed;right:2px;top:0;width:3px;border-radius:2px;background:var(--sbc,var(--acc));opacity:0;transition:opacity .5s;pointer-events:none;z-index:5}
+#sb.on{opacity:.85;transition:opacity .1s}
+button{touch-action:manipulation}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Inter","SF Pro Text",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;-webkit-text-size-adjust:100%;background:var(--bg);color:var(--ink);font:15px/1.45 "Inter","SF Pro Text",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:520px;margin:0 auto;padding:22px 16px 60px}
 h1{font-size:26px;letter-spacing:-.02em;margin:6px 0 2px}
 .sub{color:var(--mute);margin:0 0 20px}
@@ -62,11 +68,21 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
 .al{background:none;padding:4px;color:var(--mute);opacity:.45;line-height:0}.al.on{color:var(--acc);opacity:1}.al.on svg{stroke-width:2.5}
 .sv{display:flex;align-items:center;gap:6px}.al.sm svg{width:20px;height:20px}
 #wg.stale{color:var(--acc)}#wg.stale:after{content:" •"}#cps{margin-top:10px}
-</style></head><body><main>
+.sct{color:var(--mute);font-weight:500}
+</style></head><body><div id="sc"><main>
 <h1>E-Gate Planner</h1>
-<p class="sub">Upload your roster. Get your bus and wake-up time.</p>
+<p class="sub">Your bus and wake-up time for every e-gate.</p>
 <details class="card" id="bus"><summary>Next buses</summary><div id="bx"></div></details>
 
+<div class="card tm" id="tm" hidden><div><small id="tl"></small><span id="tw"></span></div><b id="tt"></b></div>
+<div id="list"></div>
+<details class="card man"><summary>Add e-gate manually</summary><div class="mi">
+  <label>Date</label>
+  <div class="dt"><button id="dm" aria-label="Previous day">‹</button><b id="dd"></b><button id="dpl" aria-label="Next day">›</button></div>
+  <label for="eg">E-gate time (24h)</label>
+  <div class="row"><input id="eg" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off"><button id="add">Add</button></div>
+  <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
+</div></details>
 <div class="card">
   <button class="sec2" id="up">Upload roster PDF</button>
   <input type="file" id="fl" accept="application/pdf,.pdf" hidden>
@@ -81,18 +97,9 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
     <p>All times are Dubai time (GMT+4). Duties disappear 1 hour after e-gate.</p>
   </div></details>
 </div>
-<div class="card tm" id="tm" hidden><div><small id="tl"></small><span id="tw"></span></div><b id="tt"></b></div>
-<div id="list"></div>
-<details class="card man"><summary>Add e-gate manually</summary><div class="mi">
-  <label>Date</label>
-  <div class="dt"><button id="dm" aria-label="Previous day">‹</button><b id="dd"></b><button id="dpl" aria-label="Next day">›</button></div>
-  <label for="eg">E-gate time (24h)</label>
-  <div class="row"><input id="eg" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off"><button id="add">Add</button></div>
-  <p class="err" id="er" hidden></p><p class="hint" id="rd"></p>
-</div></details>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.21 Offline</p>
-</main>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.22</p>
+</main></div><div id="sb"></div>
 <script>
 const T="0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0601-0645 0621-0705 0641-0725 0701-0745 0721-0805 0744-0828 0804-0848 0824-0908 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043 0016-0100".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
 const E="0005 0020 0040 0100 0120 0140 0200 0220 0240 0305 0330 0355 0415 0435 0455 0515 0535 0555 0615 0635 0655 0715 0735 0755 0815 0835 0855 0920 0945 1010 1035 1100 1125 1150 1215 1240 1305 1330 1355 1420 1445 1510 1535 1555 1615 1635 1655 1715 1735 1800 1825 1850 1915 1940 2005 2030 2055 2120 2145 2210 2230 2250 2310 2330 2350".split(" ").map(s=>+s.slice(0,2)*60+ +s.slice(2)),H=E.map((e,i)=>({d:e,dur:(T[i].d-e+1440)%1440}));
@@ -104,10 +111,10 @@ const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",mont
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
 let duties=[],sent=[];
-try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:+d.t,f:d.f||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
+try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:+d.t,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
 try{sent=JSON.parse(localStorage.getItem("egw")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
-function addDuty(t,f){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f}else duties.push({t,f:f||"",a:false,l:false})}
+function addDuty(t,f,sec){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push({t,f:f||"",s:sec||"",a:false,l:false})}
 function plan(eg){
   const d0=day0(eg),E=(eg-d0)/6e4;let b=null;
   for(const o of[-1,0])for(const t of T){const dep=o*1440+t.d,arr=dep+t.dur;if(arr<=E&&(!b||arr>b.arr))b={dep,arr}}
@@ -126,7 +133,7 @@ function render(){
   const now=Date.now(),L=[...duties].sort((a,b)=>a.t-b.t),nxt=L.findIndex(d=>plan(d.t).dep>now);
   $("list").innerHTML=L.length?L.map((d,i)=>{
     const t=d.t,p=plan(t),df=x=>day0(x)!==day0(t)?" ("+dl(x)+")":"";
-    return`<div class="card duty"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
+    return`<div class="card duty"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}${d.s?` <span class="sct">${esc(d.s)}</span>`:""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
     <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span><button class="al ${d.a?"on":""}" data-al="a:${t}" aria-label="${d.a?"Alarms added":"Add wake-up and leave-home alarms"}" aria-pressed="${d.a}">${CLOCK}</button></div>
     <div class="steps">
       <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b></div>
@@ -145,7 +152,7 @@ const WIDGET="WakeUp",keys=L=>L.map(d=>d.t+(d.f||"")).sort().join(),live=L=>L.fi
 function widgetState(){$("wg").hidden=!duties.length&&!live(sent).length;$("wg").classList.toggle("stale",keys(live(duties))!==keys(live(sent)))}
 function sendWidget(){
   const now=Date.now(),L=duties.map(d=>({d,p:plan(d.t)})).filter(x=>x.p.dep>now).sort((a,b)=>a.d.t-b.d.t)
-    .map(({d,p})=>({e:d.t,w:p.wake,l:p.leave,b:p.dep,f:d.f,es:hm(d.t),ws:hm(p.wake),ls:hm(p.leave),bs:hm(p.dep),dl:dl(p.wake)}));
+    .map(({d,p})=>({e:d.t,w:p.wake,l:p.leave,b:p.dep,f:d.f,s:d.s,es:hm(d.t),ws:hm(p.wake),ls:hm(p.leave),bs:hm(p.dep),dl:dl(p.wake)}));
   sent=duties.map(d=>({t:d.t,f:d.f}));try{localStorage.setItem("egw",JSON.stringify(sent))}catch(e){}
   widgetState();location.href="scriptable:///run/"+WIDGET+"?d="+encodeURIComponent(JSON.stringify(L));
 }
@@ -158,13 +165,13 @@ function tick(){buses();
   if(keep.length!==duties.length){duties=keep;save();render()}
   const el=$("tm");let n=null;
   duties.forEach(d=>{const p=plan(d.t),e=now<p.wake?{t:p.wake,k:"w"}:now<p.dep?{t:p.dep,k:"b"}:null;if(e&&(!n||e.t<n.t))n=e});
-  if(!n){el.hidden=true;return}
+  if(!n){el.hidden=true;document.documentElement.style.removeProperty("--sbc");return}
   el.hidden=false;const ms=n.t-now,s=Math.floor(ms/1000),hr=ms/36e5,m=ms/6e4,dd=Math.floor(s/86400),hh=Math.floor(s%86400/3600);
   const c=n.k==="w"?(hr<=4?"var(--r)":hr<=12?"var(--y)":hr<=24?"var(--g)":"var(--mute)"):(m<=15?"var(--r)":m<=30?"var(--y)":"var(--g)");
   $("tt").textContent=(dd?dd+"d "+pad(hh):hh)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
   $("tl").textContent=n.k==="w"?"Next wake-up":"Bus leaves";
   $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):"From SAFA TWR at "+hm(n.t);
-  $("tt").style.color=c;el.style.borderColor=c;
+  $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c);
 }
 function add(){
   const n=norm($("eg").value),er=$("er");
@@ -203,7 +210,9 @@ async function pdfItems(f){
 function parseRoster(pages){
   const all=pages.flat().map(i=>i.s).join(" ").replace(/\s+/g," "),h=all.match(/(\d{1,2})-(\d{1,2})-(\d{4}) to/);
   if(!h)return null;if(!/times are in local/i.test(all))return{error:"This roster isn't in local times, so it can't be read safely."};
-  const sd=+h[1],sm=+h[2]-1,sy=+h[3],out=[],DAY=/^(\d{2}) (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,FL=/(\d{2}:\d{2}) (\d{1,4}) ([A-Z]{3}) (\d{2}:\d{2}) ([A-Z]{3}) (\d{2}:\d{2})/g;let last=null;
+  const sd=+h[1],sm=+h[2]-1,sy=+h[3],out=[],e=all.match(/\d{1,2}-\d{1,2}-\d{4} to (\d{1,2})-(\d{1,2})-(\d{4})/);
+  // Roster period, so flights swapped away can be removed. E-gates can fall the evening before day one.
+  if(e)out.range=[wall(sy,sm,sd)-6*36e5,wall(+e[3],+e[2]-1,+e[1]+1)],DAY=/^(\d{2}) (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,FL=/(\d{2}:\d{2}) (\d{1,4}) ([A-Z]{3}) (\d{2}:\d{2}) ([A-Z]{3}) (\d{2}:\d{2})/g;let last=null;
   pages.forEach(items=>{
     const lines=[];items.slice().sort((a,b)=>b.y-a.y).forEach(it=>{const l=lines.find(l=>Math.abs(l.y-it.y)<2);l?l.it.push(it):lines.push({y:it.y,it:[it]})});
     lines.forEach(l=>{l.t=l.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(" ").replace(/\s+/g," ").trim()});
@@ -211,7 +220,7 @@ function parseRoster(pages){
     lines.forEach(l=>{let m;FL.lastIndex=0;while((m=FL.exec(l.t))){
       let b=null;dates.forEach(d=>{const dist=Math.abs(d.y-l.y);if(!b||dist<b.dist-1||(Math.abs(dist-b.dist)<=1&&d.y>b.y))b={y:d.y,d:d.d,dist}});
       const day=b?b.d:last;if(day==null||m[3]!=="DXB")continue;
-      const[H,M]=m[4].split(":").map(Number);out.push({t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2]})}});
+      const[H,M]=m[4].split(":").map(Number);out.push({t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2],s:m[3]+"-"+m[5]})}});
     if(dates.length)last=dates[dates.length-1].d});
   return out;
 }
@@ -224,12 +233,29 @@ $("fl").onchange=async()=>{
     if(r===null)st("This doesn't look like your My Roster PDF.");
     else if(r.error)st(r.error);
     else if(!r.length)st("No flights from DXB found in this roster.");
-    else{r.forEach(x=>addDuty(x.t,x.f));save();render();tick();st(`Added ${r.length} flight${r.length>1?"s":""} from DXB. Check the e-gates against your roster.`)}}
+    else{let gone=[];
+      // Flights from an earlier upload in this period that aren't on the roster any more (swapped away). Manual e-gates stay.
+      if(r.range){const keep=new Set(r.map(x=>x.t));gone=duties.filter(d=>d.f&&d.t>=r.range[0]&&d.t<r.range[1]&&!keep.has(d.t));duties=duties.filter(d=>!gone.includes(d))}
+      r.forEach(x=>addDuty(x.t,x.f,x.s));save();render();tick();
+      st(`Found ${r.length} flight${r.length>1?"s":""} from DXB${gone.length?`, removed ${gone.length} no longer on your roster`:""}. Check the e-gates against your roster.`)}}
   catch(e){st(navigator.onLine?"Couldn't open that PDF.":"Couldn't open that PDF offline. Open the app once with internet, then try again.")}
   $("up").disabled=false;
 };
 try{$("bus").open=localStorage.getItem("egbus")==="1"}catch(e){}
 $("bus").ontoggle=()=>{try{localStorage.setItem("egbus",$("bus").open?"1":"")}catch(e){}buses()};
+/* scroll bar */
+const sc=$("sc"),sb=$("sb");let sbT;
+function sbar(){
+  const cs=getComputedStyle(sc),top=parseFloat(cs.paddingTop)+4,track=sc.clientHeight-top-parseFloat(cs.paddingBottom)-8,max=sc.scrollHeight-sc.clientHeight;
+  if(max<2||track<40){sb.classList.remove("on");return}
+  const len=Math.max(28,track*sc.clientHeight/sc.scrollHeight),y=top+(track-len)*Math.min(1,Math.max(0,sc.scrollTop/max));
+  sb.style.height=len+"px";sb.style.transform=`translateY(${y}px)`;sb.classList.add("on");
+  clearTimeout(sbT);sbT=setTimeout(()=>sb.classList.remove("on"),900);
+}
+sc.addEventListener("scroll",sbar,{passive:true});
+/* no pinch zoom: iOS ignores user-scalable=no, so cancel its gesture events too */
+["gesturestart","gesturechange","gestureend"].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener("touchmove",e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 showDate();render();tick();setInterval(tick,1000);
 if("serviceWorker"in navigator&&location.protocol.startsWith("http")){
   // Check for a new version when the connection comes back or the app is reopened, and switch to it.
