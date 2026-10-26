@@ -101,7 +101,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.27</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.28</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0016-0100 0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0556-0640 0611-0655 0626-0710 0646-0730 0701-0745 0716-0800 0736-0820 0756-0840 0816-0900 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -110,6 +110,8 @@ const WALK=10,PREP=60,MAXEARLY=20,OFF=4*36e5,SHORTCUT="E-Gate Alarm";
 const $=i=>document.getElementById(i),pad=n=>String(n).padStart(2,"0"),esc=s=>String(s??"").replace(/[&<>"]/g,c=>"&#"+c.charCodeAt(0)+";");
 const wall=(y,m,d,h=0,mi=0)=>Date.UTC(y,m,d,h,mi)-OFF,W=ms=>new Date(ms+OFF);
 const hm=x=>{const d=W(+x);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())};
+// Alarm times go to Shortcuts with AM/PM: a bare "10:16" on a 12-hour iPhone can be read as 10:16 PM.
+const ampm=x=>{const d=W(+x),h=d.getUTCHours();return(h%12||12)+":"+pad(d.getUTCMinutes())+(h<12?" AM":" PM")};
 const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
@@ -191,7 +193,7 @@ $("dm").onclick=()=>step(-1);$("dpl").onclick=()=>step(1);
 $("list").onclick=e=>{
   const al=e.target.closest("[data-al]"),rm=e.target.closest("[data-x]");
   if(al){const[k,v]=al.dataset.al.split(":"),d=duties.find(x=>x.t===+v);if(!d)return;
-    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=hm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")\n"+hm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
+    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=ampm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")\n"+ampm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
       d[k]=true;location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(txt)}
     save();render()}
   else if(rm){duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}};
