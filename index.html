@@ -53,7 +53,7 @@ button.ghost{background:transparent;color:var(--mute);font-weight:500;padding:6p
 .step.k:before{background:var(--acc)}.step b{font-variant-numeric:tabular-nums}
 .warn{color:var(--warn);font-size:13px;margin-top:8px}
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.duty .foot button.ghost{padding:6px 0 0 12px}
+.duty .foot button.ghost{padding:6px 0 0 12px}.duty .foot button.ghost.fl{padding:6px 12px 0 0}
 .empty{text-align:center;color:var(--mute);padding:28px 10px}
 
 .tm b{font-size:30px;white-space:nowrap}
@@ -76,9 +76,8 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
 .ob.done{opacity:.45}
 .sep{border:0;border-top:1px dashed var(--line);margin:16px 0 14px}
 .rt .head{margin-bottom:12px}
-.pk{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:4px}
+.pk input,.pk .dt button{background:transparent}
 .pk .dt{margin-bottom:10px}.pk .row{margin-top:2px}
-.pkc{display:flex;justify-content:flex-end;margin-top:4px}
 .bad{color:var(--r);font-size:13px;margin-top:8px;font-weight:600}
 </style></head><body><div id="sc"><main>
 <h1>E-Gate Planner</h1>
@@ -110,7 +109,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.32</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.33</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0016-0100 0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0556-0640 0611-0655 0626-0710 0646-0730 0701-0745 0716-0800 0736-0820 0756-0840 0816-0900 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -125,11 +124,11 @@ const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",mont
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
 let duties=[],sent=[];
-try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:Math.round(d.t/6e4)*6e4,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l,pk:+d.pk||0,ra:!!d.ra,rc:!!d.rc,rd:+d.rd||0,rr:d.rr||"",rf:d.rf||"",rs:d.rs||""})).filter(d=>d.t)}catch(e){}
+try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:Math.round(d.t/6e4)*6e4,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l,pk:+d.pk||0,ra:!!d.ra,rc:!!d.rc,rd:+d.rd||0,rr:d.rr||"",rf:d.rf||"",rs:d.rs||"",tn:!!d.tn})).filter(d=>d.t)}catch(e){}
 try{sent=JSON.parse(localStorage.getItem("egw")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
 // ret: return flight read from the roster {rd, rr, rf, rs}. A pickup the user set (pk) is kept on re-upload.
-function addDuty(t,f,sec,ret){let x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push(x={t,f:f||"",s:sec||"",a:false,l:false,pk:0,ra:false,rc:false,rd:0,rr:"",rf:"",rs:""});
+function addDuty(t,f,sec,ret){let x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push(x={t,f:f||"",s:sec||"",a:false,l:false,pk:0,ra:false,rc:false,rd:0,rr:"",rf:"",rs:"",tn:false});
   if(ret)Object.assign(x,ret)}
 /* Return leg. Pickup and outstation times are wall-clock "naive" values: UTC fields hold the local time
    as typed or as on the roster. They are read in the phone's current time zone, so a pickup typed as
@@ -177,13 +176,15 @@ function render(){
     ${p.gap>MAXEARLY?`<div class="warn">No bus lands within ${MAXEARLY} min of e-gate. Best option arrives ${p.gap} min early.</div>`:""}
     <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div></div>
     ${retHtml(d)}
-    <div class="foot"><span></span><button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
+    <div class="foot">${d.pk&&!d.tn?editing===t?`<button class="ghost fl" data-pc="${t}">Cancel</button>`:`<button class="ghost fl" data-pe="${t}">Change pickup</button>`:"<span></span>"}<button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
   :'<div class="card empty">No e-gates yet. Add your roster at the bottom, or add one manually.</div>';
   widgetState();
 }
 function retHtml(d){
   const t=d.t,rf=rflight(d),rs=rsector(d),q=rplan(d),dep=d.rd?`<div class="step k"><span>Flight departs</span><b>${lhm(d.rd)}</b></div>`:"";
   const head=`<div class="head"><span class="day">${d.rd?ldl(d.rd)+" · ":""}${rf?esc(rf):"Return"}${rs?` <span class="sct">${esc(rs)}</span>`:""}</span></div>`;
+  // Turnaround: no hotel, so no pickup. Just the return flight.
+  if(d.tn)return`<hr class="sep"><div class="rt">${head}<div class="hint">Turnaround · flight departs ${lhm(d.rd)} local${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div></div>`;
   if(!q||editing===t){
     // Pickup day: the one being picked, else the pickup's, the return flight's, or the day after e-gate.
     const w=W(t),day=pday[t]??(q?lday(d.pk):d.rd?lday(d.rd):nv(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate()+1));pday[t]=day;
@@ -191,8 +192,7 @@ function retHtml(d){
       <label>Hotel pickup · local time on this phone</label>
       <div class="dt"><button data-pd="-1" aria-label="Previous day">‹</button><b>${ldl(day)}</b><button data-pd="1" aria-label="Next day">›</button></div>
       <div class="row"><input class="pki" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off" placeholder="e.g. 0915" value="${q?lhm(d.pk):""}"><button data-ps="${t}">Set</button></div>
-      <p class="hint pkr">${d.rd?`Flight departs ${ldl(d.rd)} · ${lhm(d.rd)} local`:"Type the pickup time in 24h, e.g. 0915."}</p><p class="err pke" hidden></p>
-      ${q?`<div class="pkc"><button class="ghost" data-pc="${t}">Cancel</button></div>`:""}</div></div>`}
+      <p class="hint pkr">${d.rd?`Flight departs ${ldl(d.rd)} · ${lhm(d.rd)} local`:"Type the pickup time in 24h, e.g. 0915."}</p><p class="err pke" hidden></p></div></div>`}
   const df=x=>lday(x)!==lday(d.pk)?" ("+ldl(x)+")":"",gap=d.rd?Math.round((d.rd-d.pk)/6e4):null;
   const bad=gap==null?"":gap<=0?`<div class="bad">Pickup is at or after the flight's departure. Check the pickup time and day.</div>`:gap>300?`<div class="bad">Pickup is ${Math.floor(gap/60)}h ${pad(gap%60)}m before the flight. Check the pickup day.</div>`:"";
   return`<hr class="sep"><div class="rt">${head}
@@ -203,8 +203,7 @@ function retHtml(d){
     </div>${bad}
     ${sent.length&&!sent.some(x=>x.t===t&&x.pk===d.pk)?`<div class="warn">Tap Update widget at the bottom so the widget shows this pickup.</div>`:""}
     ${d.rc?`<div class="warn">Pickup changed. Delete the old alarms in Clock, then tap the clock to add the new ones.</div>`:""}
-    <div class="hint">${ldl(d.pk)} · local time on this phone (${gmt(q.P)})${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div>
-    <div class="pkc"><button class="ghost" data-pe="${t}">Change pickup</button></div></div>`;
+    <div class="hint">${ldl(d.pk)} · local time on this phone (${gmt(q.P)})${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div></div>`;
 }
 function setPickup(t){
   const d=duties.find(x=>x.t===t),box=document.querySelector(`[data-pk="${t}"]`);if(!d||!box)return;
@@ -310,16 +309,21 @@ function parseRoster(pages){
       const day=b?b.d:last;if(day==null)continue;
       const mon=day<sd?sm+1:sm,[h1,m1]=m[4].split(":").map(Number);rows.push({n:+m[2],a:m[3],z:m[5],dep:nv(sy,mon,day,h1,m1),arr:m[6]});
       if(m[3]!=="DXB")continue;
-      const[H,M]=m[4].split(":").map(Number),x={t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2],s:m[3]+"-"+m[5]};
+      const[H,M]=m[4].split(":").map(Number),x={t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2],s:m[3]+"-"+m[5],at:m[6]};
       // The same flight leaving DXB twice within 12h is one duty (e.g. an air return, then the re-departure):
       // keep the first e-gate, but the real sector rather than DXB-DXB.
       const dup=out.find(o=>o.f===x.f&&Math.abs(o.t-x.t)<12*36e5);
-      if(dup){const[a,z]=dup.t<=x.t?[dup,x]:[x,dup];dup.t=a.t;dup.s=a.s==="DXB-DXB"?z.s:a.s}else out.push(x)}});
+      if(dup){const[a,z]=dup.t<=x.t?[dup,x]:[x,dup];dup.t=a.t;[dup.s,dup.at]=a.s==="DXB-DXB"?[z.s,z.at]:[a.s,a.at]}else out.push(x)}});
     if(dates.length)last=dates[dates.length-1].d});
   // Return leg: flight number +1 leaving the outbound destination within 14 days. Its time is local at that station.
   out.forEach(x=>{const n=+x.f.slice(2),to=x.s.split("-")[1],od=W(x.t+150*6e4),dep=nv(od.getUTCFullYear(),od.getUTCMonth(),od.getUTCDate(),od.getUTCHours(),od.getUTCMinutes());
     const rt=rows.filter(o=>o.n===n+1&&o.a===to&&o.dep>dep&&o.dep<dep+14*864e5).sort((a,b)=>a.dep-b.dep)[0];
-    if(rt)x.ret={rd:rt.dep,rr:rt.z==="DXB"?rt.arr:"",rf:"EK"+String(n+1).padStart(x.f.length-2,"0"),rs:rt.a+"-"+rt.z}});
+    if(!rt)return;
+    // Turnaround: the return leaves within 8h of landing. Both times are local at the outstation, so the
+    // ground time is exact once the landing day is known: the departure day, or the next if the local
+    // landing time is well before the Dubai departure time (no Emirates route lands 3h+ "before" it left).
+    const[ah,am]=x.at.split(":").map(Number);let arr=nv(od.getUTCFullYear(),od.getUTCMonth(),od.getUTCDate(),ah,am);if(arr<dep-3*36e5)arr+=864e5;
+    x.ret={rd:rt.dep,rr:rt.z==="DXB"?rt.arr:"",rf:"EK"+String(n+1).padStart(x.f.length-2,"0"),rs:rt.a+"-"+rt.z,tn:rt.dep-arr<8*36e5}});
   return out;
 }
 $("up").onclick=()=>$("fl").click();
