@@ -1,4 +1,4 @@
-// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.31).
+// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.35).
 // In Scriptable, create a script named exactly "WakeUp" and paste this in.
 // The planner sends your duties with its "Update widget" button.
 const KEY = "wakeup.duties", H = 36e5, DAY = 24 * H;
@@ -50,7 +50,7 @@ function timer(s0, st, now, d, size) {
 }
 // Timeline rows: past steps fade, the one being counted down to takes the colour.
 function rows(s0, d, st, now, size) {
-  const R0 = ret(d) ? [["Wake up", d.w, d.ws, st.wake], ["Leave room", d.l, d.ls], ["Pickup", d.b, d.bs, !st.wake], ["Departs", d.e, d.es]]
+  const R0 = ret(d) ? [["Wake up", d.w, d.ws, st.wake], ["Leave room", d.l, d.ls], ["Pickup", d.b, d.bs, !st.wake]]
     : [["Wake up", d.w, d.ws, st.wake], ["Leave home", d.l, d.ls], ["Bus", d.b, d.bs, !st.wake], ["E-gate", d.e, d.es]];
   R0.filter(r => r[2]).forEach(([k, at, s, hot], i) => {
     if (i) s0.addSpacer(2);
@@ -124,7 +124,7 @@ function lock(family, d, now) {
   text(st.wake ? `Wake up ${d.ws}` : ret(d) ? `Pickup ${d.bs}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
   timer(w, st, now, d, 22);
   const line = ret(d)
-    ? (st.wake ? (far ? `${d.dl} · pickup ${d.bs}` : `Pickup ${d.bs}${d.f ? " · " + d.f : ""}`) : `${flight(d)}${d.es ? " · departs " + d.es : ""}`)
+    ? (st.wake ? (far ? `${d.dl} · pickup ${d.bs}` : `Pickup ${d.bs}${d.f ? " · " + d.f : ""}`) : flight(d))
     : (st.wake ? (far ? `${d.dl} · bus ${d.bs}` : `Bus ${d.bs} · e-gate ${d.es}`) : `E-gate ${d.es}${flight(d) ? " · " + flight(d) : ""}`);
   text(line, w, Font.systemFont(12), null, 0.75);
   return w;
