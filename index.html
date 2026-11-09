@@ -72,6 +72,14 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
 .sv{display:flex;align-items:center;gap:6px}.al.sm svg{width:20px;height:20px}
 #wg.stale{color:var(--acc)}#wg.stale:after{content:" •"}#cps{margin-top:10px}
 .sct{color:var(--mute);font-weight:500}
+/* return leg: same card, under a separator */
+.ob.done{opacity:.45}
+.sep{border:0;border-top:1px dashed var(--line);margin:16px 0 14px}
+.rt .head{margin-bottom:12px}
+.pk{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:4px}
+.pk .dt{margin-bottom:10px}.pk .row{margin-top:2px}
+.pkc{display:flex;justify-content:flex-end;margin-top:4px}
+.bad{color:var(--r);font-size:13px;margin-top:8px;font-weight:600}
 </style></head><body><div id="sc"><main>
 <h1>E-Gate Planner</h1>
 <p class="sub">Your bus and wake-up time for every e-gate.</p>
@@ -97,11 +105,12 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
     <p>Alarms: tap the clock next to the wake-up time to add both the wake-up and leave-home alarms through your "E-Gate Alarm" shortcut. Clock alarms have no date, so add them within 24 hours of waking up. Tap again to mark as not added.</p>
     <p>Lock Screen widget: install the free Scriptable app, create a script named WakeUp and paste in the widget script (copy it below). Add a Scriptable widget to your Lock Screen and choose WakeUp. Tap Update widget at the bottom after each roster upload or change. It shows a live countdown to your next wake-up, then to your bus.</p>
     <button class="sec2" id="cps">Copy widget script</button>
-    <p>All times are Dubai time (GMT+4). Duties disappear 1 hour after e-gate.</p>
+    <p>Hotel pickup: under each flight, set the pickup time at the outstation. Wake-up is 1h20 before pickup, leave room 20 min before. Pickup times always use the phone's local time, so check the phone shows local time at the hotel. If the pickup moves, tap Change pickup, then re-add the alarms.</p>
+    <p>Dubai departures are in Dubai time (GMT+4). A duty disappears 3 hours after its hotel pickup (or 3 hours after the return flight if no pickup is set).</p>
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.28</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.29</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0016-0100 0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0556-0640 0611-0655 0626-0710 0646-0730 0701-0745 0716-0800 0736-0820 0756-0840 0816-0900 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -116,10 +125,29 @@ const dl=x=>W(+x).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",mont
 const day0=ms=>{const w=W(ms);return wall(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate())};
 const CLOCK='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.8M5.2 4.3 2.8 6.5M18.8 4.3l2.4 2.2"/></svg>';
 let duties=[],sent=[];
-try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:Math.round(d.t/6e4)*6e4,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l})).filter(d=>d.t)}catch(e){}
+try{const r=JSON.parse(localStorage.getItem("egp")||"{}");duties=(r.duties||[]).map(d=>({t:Math.round(d.t/6e4)*6e4,f:d.f||"",s:d.s||"",a:!!d.a,l:!!d.l,pk:+d.pk||0,ra:!!d.ra,rc:!!d.rc,rd:+d.rd||0,rr:d.rr||"",rf:d.rf||"",rs:d.rs||""})).filter(d=>d.t)}catch(e){}
 try{sent=JSON.parse(localStorage.getItem("egw")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("egp",JSON.stringify({duties}))}catch(e){}};
-function addDuty(t,f,sec){const x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push({t,f:f||"",s:sec||"",a:false,l:false})}
+// ret: return flight read from the roster {rd, rr, rf, rs}. A pickup the user set (pk) is kept on re-upload.
+function addDuty(t,f,sec,ret){let x=duties.find(d=>d.t===t);if(x){if(f)x.f=f;if(sec)x.s=sec}else duties.push(x={t,f:f||"",s:sec||"",a:false,l:false,pk:0,ra:false,rc:false,rd:0,rr:"",rf:"",rs:""});
+  if(ret)Object.assign(x,ret)}
+/* Return leg. Pickup and outstation times are wall-clock "naive" values: UTC fields hold the local time
+   as typed or as on the roster. They are read in the phone's current time zone, so a pickup typed as
+   09:15 means 09:15 wherever the phone is, matching Clock alarms, which have no time zone either. */
+const nv=(y,m,d,h=0,mi=0)=>Date.UTC(y,m,d,h,mi),N=n=>new Date(n);
+const loc=n=>{const d=N(n);return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes()).getTime()};
+const lhm=n=>{const d=N(n);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())};
+const lampm=n=>{const d=N(n),h=d.getUTCHours();return(h%12||12)+":"+pad(d.getUTCMinutes())+(h<12?" AM":" PM")};
+const ldl=n=>N(n).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
+const lday=n=>{const d=N(n);return nv(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())};
+const gmt=ms=>{const o=-N(ms).getTimezoneOffset(),a=Math.abs(o);return"GMT"+(o<0?"−":"+")+Math.floor(a/60)+(a%60?":"+pad(a%60):"")};
+const ROOM=20,RWAKE=80,KEEP=3*36e5;
+const rflight=d=>d.rf||(d.f?d.f.replace(/(\d+)$/,n=>String(+n+1).padStart(n.length,"0")):"");
+const rsector=d=>d.rs||(d.s?d.s.split("-").reverse().join("-"):"");
+function rplan(d){if(!d.pk)return null;const w=d.pk-RWAKE*6e4,l=d.pk-ROOM*6e4;return{w,l,p:d.pk,W:loc(w),L:loc(l),P:loc(d.pk)}}
+// A card stays until 3h after pickup; without a pickup, until 3h after the return flight, or 7 days after e-gate.
+const endOf=d=>d.pk?loc(d.pk)+KEEP:d.rd?loc(d.rd)+KEEP:d.t+7*864e5;
+let editing=null;const pday={};
 function plan(eg){
   const d0=day0(eg),E=(eg-d0)/6e4;let b=null;
   for(const o of[-1,0])for(const t of T){const dep=o*1440+t.d,arr=dep+t.dur;if(arr<=E&&(!b||arr>b.arr))b={dep,arr}}
@@ -138,7 +166,7 @@ function render(){
   const now=Date.now(),L=[...duties].sort((a,b)=>a.t-b.t),nxt=L.findIndex(d=>plan(d.t).dep>now);
   $("list").innerHTML=L.length?L.map((d,i)=>{
     const t=d.t,p=plan(t),df=x=>day0(x)!==day0(t)?" ("+dl(x)+")":"";
-    return`<div class="card duty"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}${d.s?` <span class="sct">${esc(d.s)}</span>`:""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
+    return`<div class="card duty"><div class="ob${now>p.dep?" done":""}" data-dep="${p.dep}"><div class="head"><span class="day">${dl(t)}${d.f?" · "+esc(d.f):""}${d.s?` <span class="sct">${esc(d.s)}</span>`:""}</span>${i===nxt?'<span class="tag">Next</span>':""}</div>
     <div class="wake"><b>${hm(p.wake)}</b><span>wake up${df(p.wake)}</span><button class="al ${d.a?"on":""}" data-al="a:${t}" aria-label="${d.a?"Alarms added":"Add wake-up and leave-home alarms"}" aria-pressed="${d.a}">${CLOCK}</button></div>
     <div class="steps">
       <div class="step"><span>Leave home</span><b>${hm(p.leave)}</b></div>
@@ -147,10 +175,45 @@ function render(){
       <div class="step k"><span>E-gate</span><b>${hm(t)}</b></div>
     </div>
     ${p.gap>MAXEARLY?`<div class="warn">No bus lands within ${MAXEARLY} min of e-gate. Best option arrives ${p.gap} min early.</div>`:""}
-    <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div>
+    <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div></div>
+    ${retHtml(d)}
     <div class="foot"><span></span><button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
-  :'<div class="card empty">No e-gates yet. Type one above or add your roster.</div>';
+  :'<div class="card empty">No e-gates yet. Add your roster at the bottom, or add one manually.</div>';
   widgetState();
+}
+function retHtml(d){
+  const t=d.t,rf=rflight(d),rs=rsector(d),q=rplan(d),dep=d.rd?`<div class="step k"><span>Flight ${esc(rf)} departs</span><b>${lhm(d.rd)}</b></div>`:"";
+  const head=`<div class="head"><span class="day">${rf?esc(rf):"Return"}${rs?` <span class="sct">${esc(rs)}</span>`:""}</span></div>`;
+  if(!q||editing===t){
+    // Pickup day: the one being picked, else the pickup's, the return flight's, or the day after e-gate.
+    const w=W(t),day=pday[t]??(q?lday(d.pk):d.rd?lday(d.rd):nv(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate()+1));pday[t]=day;
+    return`<hr class="sep"><div class="rt">${head}<div class="pk" data-pk="${t}">
+      <label>Hotel pickup · local time on this phone</label>
+      <div class="dt"><button data-pd="-1" aria-label="Previous day">‹</button><b>${ldl(day)}</b><button data-pd="1" aria-label="Next day">›</button></div>
+      <div class="row"><input class="pki" type="text" inputmode="numeric" pattern="[0-9:]*" maxlength="5" enterkeyhint="done" autocomplete="off" placeholder="e.g. 0915" value="${q?lhm(d.pk):""}"><button data-ps="${t}">Set</button></div>
+      <p class="hint pkr">${d.rd?`Flight departs ${ldl(d.rd)} · ${lhm(d.rd)} local`:"Type the pickup time in 24h, e.g. 0915."}</p><p class="err pke" hidden></p>
+      ${q?`<div class="pkc"><button class="ghost" data-pc="${t}">Cancel</button></div>`:""}</div></div>`}
+  const df=x=>lday(x)!==lday(d.pk)?" ("+ldl(x)+")":"",gap=d.rd?Math.round((d.rd-d.pk)/6e4):null;
+  const bad=gap==null?"":gap<=0?`<div class="bad">Pickup is at or after the flight's departure. Check the pickup time and day.</div>`:gap>300?`<div class="bad">Pickup is ${Math.floor(gap/60)}h ${pad(gap%60)}m before the flight. Check the pickup day.</div>`:"";
+  return`<hr class="sep"><div class="rt">${head}
+    <div class="wake"><b>${lhm(q.w)}</b><span>wake up${df(q.w)}</span><button class="al ${d.ra?"on":""}" data-al="ra:${t}" aria-label="${d.ra?"Alarms added":"Add wake-up and leave-room alarms"}" aria-pressed="${d.ra}">${CLOCK}</button></div>
+    <div class="steps">
+      <div class="step"><span>Leave room</span><b>${lhm(q.l)}</b></div>
+      <div class="step k"><span>Hotel pickup</span><b>${lhm(d.pk)}</b></div>${dep}
+    </div>${bad}
+    ${d.rc?`<div class="warn">Pickup changed. Delete the old alarms in Clock, then tap the clock to add the new ones.</div>`:""}
+    <div class="hint">${ldl(d.pk)} · local time on this phone (${gmt(q.P)})${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div>
+    <div class="pkc"><button class="ghost" data-pe="${t}">Change pickup</button></div></div>`;
+}
+function setPickup(t){
+  const d=duties.find(x=>x.t===t),box=document.querySelector(`[data-pk="${t}"]`);if(!d||!box)return;
+  const er=box.querySelector(".pke"),fail=m=>{er.textContent=m;er.hidden=false;box.querySelector(".pki").focus()};
+  const n=norm(box.querySelector(".pki").value);if(!n)return fail("Enter a 24h time like 0915 or 21:40.");
+  const day=N(pday[t]),pk=nv(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate(),n.h,n.m),at=loc(pk);
+  if(at<=Date.now())return fail("That pickup time has already passed. Check the day.");
+  if(at<=d.t)return fail("That's before your e-gate in Dubai. Check the day.");
+  if(pk!==d.pk){if(d.pk&&d.ra)d.rc=true;d.ra=false;d.pk=pk}
+  editing=null;delete pday[t];save();render();tick();
 }
 /* Scriptable widget */
 const WIDGET="WakeUp",keys=L=>L.map(d=>d.t+(d.f||"")).sort().join(),live=L=>L.filter(d=>d.t+36e5>Date.now());
@@ -166,16 +229,19 @@ function nextBus(list,now){const d0=day0(now);return[-1,0,1].flatMap(o=>list.map
 function buses(){if(!$("bus").open)return;const now=Date.now(),row=(t,L)=>`<div class="bl"><small>${t}</small><div class="br"><b>${hm(L[0].dep)}</b><span>${inMin(L[0].dep-now)} · arrives ${hm(L[0].arr)}</span></div><span class="th">Then ${hm(L[1].dep)}</span></div>`;
   $("bx").innerHTML=row("To EGHQ · from SAFA TWR",nextBus(T,now))+row("To SAFA TWR · from EGHQ",nextBus(H,now))}
 function tick(){buses();
-  const now=Date.now(),keep=duties.filter(d=>d.t+36e5>now);
+  const now=Date.now(),keep=duties.filter(d=>now<endOf(d));
   if(keep.length!==duties.length){duties=keep;save();render()}
+  document.querySelectorAll(".ob[data-dep]").forEach(o=>o.classList.toggle("done",now>+o.dataset.dep));
   const el=$("tm");let n=null;
-  duties.forEach(d=>{const p=plan(d.t),e=now<p.wake?{t:p.wake,k:"w"}:now<p.dep?{t:p.dep,k:"b"}:null;if(e&&(!n||e.t<n.t))n=e});
+  duties.forEach(d=>{const p=plan(d.t),q=rplan(d),e=now<p.wake?{t:p.wake,k:"w"}:now<p.dep?{t:p.dep,k:"b"}:null,
+    f=q&&(now<q.W?{t:q.W,k:"rw",n:q.w}:now<q.P?{t:q.P,k:"p",n:q.p}:null);
+    [e,f].forEach(x=>{if(x&&(!n||x.t<n.t))n=x})});
   if(!n){el.hidden=true;document.documentElement.style.removeProperty("--sbc");return}
   el.hidden=false;const ms=n.t-now,s=Math.floor(ms/1000),hr=ms/36e5,m=ms/6e4,dd=Math.floor(s/86400),hh=Math.floor(s%86400/3600);
-  const c=n.k==="w"?(hr<=4?"var(--r)":hr<=12?"var(--y)":hr<=24?"var(--g)":"var(--mute)"):(m<=15?"var(--r)":m<=30?"var(--y)":"var(--g)");
+  const c=n.k==="w"||n.k==="rw"?(hr<=4?"var(--r)":hr<=12?"var(--y)":hr<=24?"var(--g)":"var(--mute)"):(m<=15?"var(--r)":m<=30?"var(--y)":"var(--g)");
   $("tt").textContent=(dd?dd+"d "+pad(hh):hh)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
-  $("tl").textContent=n.k==="w"?"Next wake-up":"Bus leaves";
-  $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):"From SAFA TWR at "+hm(n.t);
+  $("tl").textContent=n.k==="w"||n.k==="rw"?"Next wake-up":n.k==="p"?"Hotel pickup":"Bus leaves";
+  $("tw").textContent=n.k==="w"?dl(n.t)+" · "+hm(n.t):n.k==="b"?"From SAFA TWR at "+hm(n.t):ldl(n.n)+" · "+lhm(n.n)+" local";
   $("tt").style.color=c;el.style.borderColor=c;document.documentElement.style.setProperty("--sbc",c);
 }
 function add(){
@@ -193,10 +259,23 @@ $("dm").onclick=()=>step(-1);$("dpl").onclick=()=>step(1);
 $("list").onclick=e=>{
   const al=e.target.closest("[data-al]"),rm=e.target.closest("[data-x]");
   if(al){const[k,v]=al.dataset.al.split(":"),d=duties.find(x=>x.t===+v);if(!d)return;
-    if(d[k]){d[k]=false}else{const p=plan(d.t),txt=ampm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")\n"+ampm(p.leave)+"|Leave home (bus "+hm(p.dep)+")";
+    if(d[k]){d[k]=false}else{let txt;
+      if(k==="ra"){const q=rplan(d);if(!q)return;
+        // Local wall-clock times, with AM/PM, so Clock sets them exactly as shown on the card.
+        txt=lampm(q.w)+"|Wake up (pickup "+lhm(d.pk)+")\n"+lampm(q.l)+"|Leave room (pickup "+lhm(d.pk)+")";d.rc=false}
+      else{const p=plan(d.t);txt=ampm(p.wake)+"|Wake up (e-gate "+hm(d.t)+")\n"+ampm(p.leave)+"|Leave home (bus "+hm(p.dep)+")"}
       d[k]=true;location.href="shortcuts://run-shortcut?name="+encodeURIComponent(SHORTCUT)+"&input=text&text="+encodeURIComponent(txt)}
     save();render()}
-  else if(rm){duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}};
+  else if(rm){if(duties.find(d=>d.t===+rm.dataset.x)?.pk&&!confirm("Remove this duty and its hotel pickup?"))return;duties=duties.filter(d=>d.t!==+rm.dataset.x);save();render();tick()}
+  else if(e.target.closest("[data-pd]")){const box=e.target.closest("[data-pk]"),t=+box.dataset.pk;pday[t]+=+e.target.closest("[data-pd]").dataset.pd*864e5;box.querySelector(".dt b").textContent=ldl(pday[t]);box.querySelector(".pke").hidden=true}
+  else if(e.target.closest("[data-ps]"))setPickup(+e.target.closest("[data-ps]").dataset.ps);
+  else if(e.target.closest("[data-pe]")){editing=+e.target.closest("[data-pe]").dataset.pe;delete pday[editing];render();document.querySelector(`[data-pk="${editing}"] .pki`)?.focus()}
+  else if(e.target.closest("[data-pc]")){editing=null;render()}};
+$("list").oninput=e=>{const i=e.target.closest(".pki");if(!i)return;let v=i.value.replace(/[^\d:]/g,"");
+  if(v.includes(":")){const k=v.indexOf(":");v=(v.slice(0,k+1)+v.slice(k+1).replace(/:/g,"")).slice(0,5)}else{v=v.slice(0,4);if(v.length===4)v=v.slice(0,2)+":"+v.slice(2)}
+  i.value=v;const n=norm(v),box=i.closest("[data-pk]");box.querySelector(".pke").hidden=true;
+  if(n){const h=nv(2000,0,1,n.h,n.m);box.querySelector(".pkr").textContent="Reads as "+lhm(h)+" ("+lampm(h)+") local time"}};
+$("list").onkeydown=e=>{const i=e.target.closest(".pki");if(i&&e.key==="Enter")setPickup(+i.closest("[data-pk]").dataset.pk)};
 $("wg").onclick=sendWidget;
 $("cps").onclick=async()=>{const b=$("cps"),done=t=>{b.textContent=t;setTimeout(()=>b.textContent="Copy widget script",2500)},src=()=>fetch("scriptable/WakeUp.js",{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.text()});
   try{if(window.ClipboardItem)await navigator.clipboard.write([new ClipboardItem({"text/plain":src().then(t=>new Blob([t],{type:"text/plain"}))})]);else await navigator.clipboard.writeText(await src());done("Copied. Paste it into Scriptable.")}
@@ -218,19 +297,26 @@ function parseRoster(pages){
   const sd=+h[1],sm=+h[2]-1,sy=+h[3],out=[],e=all.match(/\d{1,2}-\d{1,2}-\d{4} to (\d{1,2})-(\d{1,2})-(\d{4})/);
   // Roster period, so flights swapped away can be removed. E-gates can fall the evening before day one.
   if(e)out.range=[wall(sy,sm,sd)-6*36e5,wall(+e[3],+e[2]-1,+e[1]+1)],DAY=/^(\d{2}) (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/,FL=/(\d{2}:\d{2}) (\d{1,4}) ([A-Z]{3}) (\d{2}:\d{2}) ([A-Z]{3}) (\d{2}:\d{2})/g;let last=null;
+  const rows=[];
   pages.forEach(items=>{
     const lines=[];items.slice().sort((a,b)=>b.y-a.y).forEach(it=>{const l=lines.find(l=>Math.abs(l.y-it.y)<2);l?l.it.push(it):lines.push({y:it.y,it:[it]})});
     lines.forEach(l=>{l.t=l.it.sort((a,b)=>a.x-b.x).map(i=>i.s).join(" ").replace(/\s+/g," ").trim()});
     const dates=lines.map(l=>{const m=l.t.match(DAY);return m?{y:l.y,d:+m[1]}:null}).filter(Boolean);
     lines.forEach(l=>{let m;FL.lastIndex=0;while((m=FL.exec(l.t))){
       let b=null;dates.forEach(d=>{const dist=Math.abs(d.y-l.y);if(!b||dist<b.dist-1||(Math.abs(dist-b.dist)<=1&&d.y>b.y))b={y:d.y,d:d.d,dist}});
-      const day=b?b.d:last;if(day==null||m[3]!=="DXB")continue;
+      const day=b?b.d:last;if(day==null)continue;
+      const mon=day<sd?sm+1:sm,[h1,m1]=m[4].split(":").map(Number);rows.push({n:+m[2],a:m[3],z:m[5],dep:nv(sy,mon,day,h1,m1),arr:m[6]});
+      if(m[3]!=="DXB")continue;
       const[H,M]=m[4].split(":").map(Number),x={t:wall(sy,day<sd?sm+1:sm,day,H,M)-150*6e4,f:"EK"+m[2],s:m[3]+"-"+m[5]};
       // The same flight leaving DXB twice within 12h is one duty (e.g. an air return, then the re-departure):
       // keep the first e-gate, but the real sector rather than DXB-DXB.
       const dup=out.find(o=>o.f===x.f&&Math.abs(o.t-x.t)<12*36e5);
       if(dup){const[a,z]=dup.t<=x.t?[dup,x]:[x,dup];dup.t=a.t;dup.s=a.s==="DXB-DXB"?z.s:a.s}else out.push(x)}});
     if(dates.length)last=dates[dates.length-1].d});
+  // Return leg: flight number +1 leaving the outbound destination within 14 days. Its time is local at that station.
+  out.forEach(x=>{const n=+x.f.slice(2),to=x.s.split("-")[1],od=W(x.t+150*6e4),dep=nv(od.getUTCFullYear(),od.getUTCMonth(),od.getUTCDate(),od.getUTCHours(),od.getUTCMinutes());
+    const rt=rows.filter(o=>o.n===n+1&&o.a===to&&o.dep>dep&&o.dep<dep+14*864e5).sort((a,b)=>a.dep-b.dep)[0];
+    if(rt)x.ret={rd:rt.dep,rr:rt.z==="DXB"?rt.arr:"",rf:"EK"+String(n+1).padStart(x.f.length-2,"0"),rs:rt.a+"-"+rt.z}});
   return out;
 }
 $("up").onclick=()=>$("fl").click();
@@ -245,7 +331,7 @@ $("fl").onchange=async()=>{
     else{let gone=[];
       // Flights from an earlier upload in this period that aren't on the roster any more (swapped away). Manual e-gates stay.
       if(r.range){const keep=new Set(r.map(x=>x.t));gone=duties.filter(d=>d.f&&d.t>=r.range[0]&&d.t<r.range[1]&&!keep.has(d.t));duties=duties.filter(d=>!gone.includes(d))}
-      r.forEach(x=>addDuty(x.t,x.f,x.s));save();render();tick();
+      r.forEach(x=>addDuty(x.t,x.f,x.s,x.ret));save();render();tick();
       st(`Found ${r.length} flight${r.length>1?"s":""} from DXB${gone.length?`, removed ${gone.length} no longer on your roster`:""}. Check the e-gates against your roster.`)}}
   catch(e){st(navigator.onLine?"Couldn't open that PDF.":"Couldn't open that PDF offline. Open the app once with internet, then try again.")}
   $("up").disabled=false;
