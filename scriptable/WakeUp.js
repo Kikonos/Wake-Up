@@ -1,4 +1,4 @@
-// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.35).
+// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.36).
 // In Scriptable, create a script named exactly "WakeUp" and paste this in.
 // The planner sends your duties with its "Update widget" button.
 const KEY = "wakeup.duties", H = 36e5, DAY = 24 * H;
@@ -21,14 +21,15 @@ function next(now) {
   return load().filter(d => d.b > now).sort((a, b) => a.b - b.b)[0] || null;
 }
 // Countdown target, colour and when the colour next changes, as in the planner.
+// Hotel days have three steps: wake up, leave room, pickup. Dubai days: wake up, bus.
 function state(d, now) {
-  const wake = now < d.w, t = wake ? d.w : d.b, ms = t - now;
+  const wake = now < d.w, leave = !wake && ret(d) && now < d.l, t = wake ? d.w : leave ? d.l : d.b, ms = t - now;
   const steps = wake ? [[DAY, G], [12 * H, Y], [4 * H, R]] : [[30 * 6e4, Y], [15 * 6e4, R]];
   let col = wake ? MUTE : G, change = t;
   for (const [lim, c] of steps) if (ms <= lim) col = c; else change = Math.min(change, t - lim);
   // Over a day out the widget shows "4d 6h", so it also redraws when the hour changes.
   if (ms > DAY) change = Math.min(change, now + ms % H);
-  return { wake, t, col, refresh: new Date(change + 1000) };
+  return { wake, leave, t, col, refresh: new Date(change + 1000) };
 }
 // Time left as "4d 6h", rounded down like the planner's countdown.
 const left = ms => `${Math.floor(ms / DAY)}d ${Math.floor(ms % DAY / H)}h`;
@@ -50,7 +51,7 @@ function timer(s0, st, now, d, size) {
 }
 // Timeline rows: past steps fade, the one being counted down to takes the colour.
 function rows(s0, d, st, now, size) {
-  const R0 = ret(d) ? [["Wake up", d.w, d.ws, st.wake], ["Leave room", d.l, d.ls], ["Pickup", d.b, d.bs, !st.wake]]
+  const R0 = ret(d) ? [["Wake up", d.w, d.ws, st.wake], ["Leave room", d.l, d.ls, st.leave], ["Pickup", d.b, d.bs, !st.wake && !st.leave]]
     : [["Wake up", d.w, d.ws, st.wake], ["Leave home", d.l, d.ls], ["Bus", d.b, d.bs, !st.wake], ["E-gate", d.e, d.es]];
   R0.filter(r => r[2]).forEach(([k, at, s, hot], i) => {
     if (i) s0.addSpacer(2);
@@ -77,7 +78,7 @@ function home(family, d, now) {
   w.refreshAfterDate = st.refresh;
   const head = (s0) => {
     const h = s0.addStack(); h.centerAlignContent();
-    text(st.wake ? "NEXT WAKE-UP" : ret(d) ? "PICKUP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
+    text(st.wake ? "NEXT WAKE-UP" : st.leave ? "LEAVE ROOM" : ret(d) ? "PICKUP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
     h.addSpacer();
     // The small widget only has room for the date or the flight.
     const info = medium ? [d.dl, flight(d)].filter(Boolean).join(" · ") : st.t - now > DAY ? d.dl : d.f || "";
@@ -87,7 +88,7 @@ function home(family, d, now) {
     head(w); w.addSpacer(6);
     const b = w.addStack(); b.centerAlignContent();
     const l = b.addStack(); l.layoutVertically();
-    text(st.wake ? d.ws : d.bs, l, Font.boldRoundedSystemFont(40), INK);
+    text(st.wake ? d.ws : st.leave ? d.ls : d.bs, l, Font.boldRoundedSystemFont(40), INK);
     timer(l, st, now, d, 26);
     b.addSpacer();
     const r = b.addStack(); r.layoutVertically(); r.size = new Size(150, 0);
@@ -108,7 +109,7 @@ function lock(family, d, now) {
   const far = st.t - now > DAY;
   if (family === "accessoryInline") {
     text(st.wake ? `⏰ ${d.ws} · ${far ? "in " + left(st.t - now) : (ret(d) ? "pickup " : "bus ") + d.bs}`
-      : ret(d) ? `🚐 Pickup ${d.bs}${d.f ? " · " + d.f : ""}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
+      : st.leave ? `🚪 Leave room ${d.ls} · pickup ${d.bs}` : ret(d) ? `🚐 Pickup ${d.bs}${d.f ? " · " + d.f : ""}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
     return w;
   }
   if (family === "accessoryCircular") {
@@ -121,10 +122,10 @@ function lock(family, d, now) {
     w.refreshAfterDate = new Date(Math.min(+st.refresh, now + (ms % step || step) + 1000));
     return w;
   }
-  text(st.wake ? `Wake up ${d.ws}` : ret(d) ? `Pickup ${d.bs}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
+  text(st.wake ? `Wake up ${d.ws}` : st.leave ? `Leave room ${d.ls}` : ret(d) ? `Pickup ${d.bs}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
   timer(w, st, now, d, 22);
   const line = ret(d)
-    ? (st.wake ? (far ? `${d.dl} · pickup ${d.bs}` : `Pickup ${d.bs}${d.f ? " · " + d.f : ""}`) : flight(d))
+    ? (st.wake || st.leave ? (far ? `${d.dl} · pickup ${d.bs}` : `Pickup ${d.bs}${d.f ? " · " + d.f : ""}`) : flight(d))
     : (st.wake ? (far ? `${d.dl} · bus ${d.bs}` : `Bus ${d.bs} · e-gate ${d.es}`) : `E-gate ${d.es}${flight(d) ? " · " + flight(d) : ""}`);
   text(line, w, Font.systemFont(12), null, 0.75);
   return w;
