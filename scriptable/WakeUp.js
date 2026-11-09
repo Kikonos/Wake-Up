@@ -1,4 +1,4 @@
-// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.25).
+// WakeUp: Lock Screen and Home Screen widget for the E-Gate Planner (v1.31).
 // In Scriptable, create a script named exactly "WakeUp" and paste this in.
 // The planner sends your duties with its "Update widget" button.
 const KEY = "wakeup.duties", H = 36e5, DAY = 24 * H;
@@ -8,10 +8,15 @@ const C = (l, d) => Color.dynamic(new Color(l), new Color(d));
 const BG = C("#ffffff", "#171a22"), INK = C("#12141a", "#eef0f4"), MUTE = C("#6b7280", "#8b93a3");
 const G = C("#16a34a", "#22c55e"), Y = C("#ca8a04", "#eab308"), R = C("#dc2626", "#ef4444");
 
+// Hotel pickups (k "r") arrive as wall-clock times; read them in the phone's current time zone.
+const wall = n => { const x = new Date(n); return new Date(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate(), x.getUTCHours(), x.getUTCMinutes()).getTime() };
 function load() {
-  try { return JSON.parse(Keychain.contains(KEY) ? Keychain.get(KEY) : "[]") } catch (e) { return [] }
+  let L = [];
+  try { L = JSON.parse(Keychain.contains(KEY) ? Keychain.get(KEY) : "[]") } catch (e) {}
+  return L.map(d => d.k === "r" ? { ...d, w: wall(d.nw), l: wall(d.nl), b: wall(d.np), e: d.nd ? wall(d.nd) : 0 } : d);
 }
-// Next duty whose bus hasn't left yet.
+const ret = d => d.k === "r";
+// Next duty or hotel pickup whose bus or pickup hasn't gone yet. b is the bus, or the pickup.
 function next(now) {
   return load().filter(d => d.b > now).sort((a, b) => a.b - b.b)[0] || null;
 }
@@ -45,7 +50,8 @@ function timer(s0, st, now, d, size) {
 }
 // Timeline rows: past steps fade, the one being counted down to takes the colour.
 function rows(s0, d, st, now, size) {
-  const R0 = [["Wake up", d.w, d.ws, st.wake], ["Leave home", d.l, d.ls], ["Bus", d.b, d.bs, !st.wake], ["E-gate", d.e, d.es]];
+  const R0 = ret(d) ? [["Wake up", d.w, d.ws, st.wake], ["Leave room", d.l, d.ls], ["Pickup", d.b, d.bs, !st.wake], ["Departs", d.e, d.es]]
+    : [["Wake up", d.w, d.ws, st.wake], ["Leave home", d.l, d.ls], ["Bus", d.b, d.bs, !st.wake], ["E-gate", d.e, d.es]];
   R0.filter(r => r[2]).forEach(([k, at, s, hot], i) => {
     if (i) s0.addSpacer(2);
     const r = s0.addStack(); r.centerAlignContent();
@@ -71,7 +77,7 @@ function home(family, d, now) {
   w.refreshAfterDate = st.refresh;
   const head = (s0) => {
     const h = s0.addStack(); h.centerAlignContent();
-    text(st.wake ? "NEXT WAKE-UP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
+    text(st.wake ? "NEXT WAKE-UP" : ret(d) ? "PICKUP" : "BUS LEAVES", h, Font.boldSystemFont(11), st.col);
     h.addSpacer();
     // The small widget only has room for the date or the flight.
     const info = medium ? [d.dl, flight(d)].filter(Boolean).join(" · ") : st.t - now > DAY ? d.dl : d.f || "";
@@ -101,7 +107,8 @@ function lock(family, d, now) {
   w.refreshAfterDate = st.refresh;
   const far = st.t - now > DAY;
   if (family === "accessoryInline") {
-    text(st.wake ? `⏰ ${d.ws} · ${far ? "in " + left(st.t - now) : "bus " + d.bs}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
+    text(st.wake ? `⏰ ${d.ws} · ${far ? "in " + left(st.t - now) : (ret(d) ? "pickup " : "bus ") + d.bs}`
+      : ret(d) ? `🚐 Pickup ${d.bs}${d.f ? " · " + d.f : ""}` : `🚌 Bus ${d.bs} · e-gate ${d.es}`, w, Font.systemFont(13));
     return w;
   }
   if (family === "accessoryCircular") {
@@ -114,9 +121,12 @@ function lock(family, d, now) {
     w.refreshAfterDate = new Date(Math.min(+st.refresh, now + (ms % step || step) + 1000));
     return w;
   }
-  text(st.wake ? `Wake up ${d.ws}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
+  text(st.wake ? `Wake up ${d.ws}` : ret(d) ? `Pickup ${d.bs}` : `Bus leaves ${d.bs}`, w, Font.boldSystemFont(13));
   timer(w, st, now, d, 22);
-  text(st.wake ? (far ? `${d.dl} · bus ${d.bs}` : `Bus ${d.bs} · e-gate ${d.es}`) : `E-gate ${d.es}${flight(d) ? " · " + flight(d) : ""}`, w, Font.systemFont(12), null, 0.75);
+  const line = ret(d)
+    ? (st.wake ? (far ? `${d.dl} · pickup ${d.bs}` : `Pickup ${d.bs}${d.f ? " · " + d.f : ""}`) : `${flight(d)}${d.es ? " · departs " + d.es : ""}`)
+    : (st.wake ? (far ? `${d.dl} · bus ${d.bs}` : `Bus ${d.bs} · e-gate ${d.es}`) : `E-gate ${d.es}${flight(d) ? " · " + flight(d) : ""}`);
+  text(line, w, Font.systemFont(12), null, 0.75);
   return w;
 }
 function build(family) {
@@ -131,7 +141,7 @@ if (q.d) {
   const d = next(Date.now()), a = new Alert();
   a.title = n < 0 ? "Couldn't read the duties" : "Widget updated";
   a.message = n < 0 ? "Tap Update widget in the planner again." :
-    `${n} dut${n === 1 ? "y" : "ies"} saved.` + (d ? `\nNext wake-up ${d.ws} · ${d.dl}` : "");
+    `${n} countdown${n === 1 ? "" : "s"} saved.` + (d ? `\nNext wake-up ${d.ws} · ${d.dl}` : "");
   a.addAction("OK");
   await a.present();
 } else if (config.runsInWidget) {

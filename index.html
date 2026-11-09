@@ -110,7 +110,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.30</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.31</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0016-0100 0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0556-0640 0611-0655 0626-0710 0646-0730 0701-0745 0716-0800 0736-0820 0756-0840 0816-0900 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -182,8 +182,8 @@ function render(){
   widgetState();
 }
 function retHtml(d){
-  const t=d.t,rf=rflight(d),rs=rsector(d),q=rplan(d);
-  const head=`<div class="head"><span class="day">${rf?esc(rf):"Return"}${rs?` <span class="sct">${esc(rs)}</span>`:""}</span></div>`;
+  const t=d.t,rf=rflight(d),rs=rsector(d),q=rplan(d),dep=d.rd?`<div class="step k"><span>Flight ${esc(rf)} departs</span><b>${lhm(d.rd)}</b></div>`:"";
+  const head=`<div class="head"><span class="day">${d.rd?ldl(d.rd)+" · ":""}${rf?esc(rf):"Return"}${rs?` <span class="sct">${esc(rs)}</span>`:""}</span></div>`;
   if(!q||editing===t){
     // Pickup day: the one being picked, else the pickup's, the return flight's, or the day after e-gate.
     const w=W(t),day=pday[t]??(q?lday(d.pk):d.rd?lday(d.rd):nv(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate()+1));pday[t]=day;
@@ -199,8 +199,9 @@ function retHtml(d){
     <div class="wake"><b>${lhm(q.w)}</b><span>wake up${df(q.w)}</span><button class="al ${d.ra?"on":""}" data-al="ra:${t}" aria-label="${d.ra?"Alarms added":"Add wake-up and leave-room alarms"}" aria-pressed="${d.ra}">${CLOCK}</button></div>
     <div class="steps">
       <div class="step"><span>Leave room</span><b>${lhm(q.l)}</b></div>
-      <div class="step k"><span>Hotel pickup</span><b>${lhm(d.pk)}</b></div>
+      <div class="step k"><span>Hotel pickup</span><b>${lhm(d.pk)}</b></div>${dep}
     </div>${bad}
+    ${sent.length&&!sent.some(x=>x.t===t&&x.pk===d.pk)?`<div class="warn">Tap Update widget at the bottom so the widget shows this pickup.</div>`:""}
     ${d.rc?`<div class="warn">Pickup changed. Delete the old alarms in Clock, then tap the clock to add the new ones.</div>`:""}
     <div class="hint">${ldl(d.pk)} · local time on this phone (${gmt(q.P)})${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div>
     <div class="pkc"><button class="ghost" data-pe="${t}">Change pickup</button></div></div>`;
@@ -216,13 +217,15 @@ function setPickup(t){
   editing=null;delete pday[t];save();render();tick();
 }
 /* Scriptable widget */
-const WIDGET="WakeUp",keys=L=>L.map(d=>d.t+(d.f||"")).sort().join(),live=L=>L.filter(d=>d.t+36e5>Date.now());
+const WIDGET="WakeUp",keys=L=>L.map(d=>d.t+(d.f||"")+"/"+(d.pk||0)).sort().join(),live=L=>L.filter(d=>(d.end??endOf(d))>Date.now());
 function widgetState(){$("wg").hidden=!duties.length&&!live(sent).length;$("wg").classList.toggle("stale",keys(live(duties))!==keys(live(sent)))}
 function sendWidget(){
   const now=Date.now(),L=duties.map(d=>({d,p:plan(d.t)})).filter(x=>x.p.dep>now).sort((a,b)=>a.d.t-b.d.t)
     .map(({d,p})=>({e:d.t,w:p.wake,l:p.leave,b:p.dep,f:d.f,s:d.s,es:hm(d.t),ws:hm(p.wake),ls:hm(p.leave),bs:hm(p.dep),dl:dl(p.wake)}));
-  sent=duties.map(d=>({t:d.t,f:d.f}));try{localStorage.setItem("egw",JSON.stringify(sent))}catch(e){}
-  widgetState();location.href="scriptable:///run/"+WIDGET+"?d="+encodeURIComponent(JSON.stringify(L));
+  // Return legs go as wall-clock times (k:"r"), so the widget reads them in the phone's time zone like the planner.
+  duties.forEach(d=>{const q=rplan(d);if(q&&q.P>now)L.push({k:"r",nw:q.w,nl:q.l,np:d.pk,nd:d.rd||0,f:rflight(d),s:rsector(d),ws:lhm(q.w),ls:lhm(q.l),bs:lhm(d.pk),es:d.rd?lhm(d.rd):"",dl:ldl(q.w)})});
+  sent=duties.map(d=>({t:d.t,f:d.f,pk:d.pk||0,end:endOf(d)}));try{localStorage.setItem("egw",JSON.stringify(sent))}catch(e){}
+  render();location.href="scriptable:///run/"+WIDGET+"?d="+encodeURIComponent(JSON.stringify(L));
 }
 const inMin=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?"now":m<60?"in "+m+" min":"in "+Math.floor(m/60)+"h "+pad(m%60)+"m"};
 function nextBus(list,now){const d0=day0(now);return[-1,0,1].flatMap(o=>list.map(x=>({dep:d0+(o*1440+x.d)*6e4,arr:d0+(o*1440+x.d+x.dur)*6e4}))).filter(x=>x.dep>=now-3e4).sort((a,b)=>a.dep-b.dep).slice(0,2)}
