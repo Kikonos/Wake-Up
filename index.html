@@ -109,7 +109,7 @@ details.card>summary::-webkit-details-marker{display:none}details.card>summary::
   </div></details>
 </div>
 <div class="foot"><button class="ghost" id="clr">Clear all</button><button class="ghost" id="wg">Update widget</button></div>
-<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.33</p>
+<p class="hint">Walk to stop 10 min · getting ready 60 min · bus from SAFA TWR to EGHQ. Data stays on this device.<br>v1.34</p>
 </main></div><div id="sb"></div>
 <script>
 const T="0016-0100 0031-0115 0046-0128 0106-0148 0126-0208 0146-0228 0206-0248 0226-0308 0246-0328 0306-0348 0331-0413 0356-0438 0421-0503 0441-0523 0501-0543 0521-0603 0541-0623 0556-0640 0611-0655 0626-0710 0646-0730 0701-0745 0716-0800 0736-0820 0756-0840 0816-0900 0844-0928 0904-0948 0924-1008 0949-1033 1014-1058 1039-1123 1104-1148 1129-1213 1154-1238 1219-1303 1244-1328 1309-1353 1334-1418 1359-1443 1424-1508 1449-1533 1514-1558 1539-1623 1604-1648 1624-1708 1644-1728 1704-1748 1724-1808 1744-1828 1804-1848 1829-1918 1854-1943 1919-2008 1944-2033 2009-2058 2034-2123 2059-2148 2124-2213 2149-2233 2214-2258 2239-2323 2259-2343 2319-0003 2339-0023 2359-0043".split(" ").map(s=>{const m=x=>+x.slice(0,2)*60+ +x.slice(2),d=m(s.slice(0,4)),r=m(s.slice(5));return{d,dur:(r-d+1440)%1440}});
@@ -145,7 +145,9 @@ const rflight=d=>d.rf||(d.f?d.f.replace(/(\d+)$/,n=>String(+n+1).padStart(n.leng
 const rsector=d=>d.rs||(d.s?d.s.split("-").reverse().join("-"):"");
 function rplan(d){if(!d.pk)return null;const w=d.pk-RWAKE*6e4,l=d.pk-ROOM*6e4;return{w,l,p:d.pk,W:loc(w),L:loc(l),P:loc(d.pk)}}
 // A card stays until 3h after pickup; without a pickup, until 3h after the return flight, or 7 days after e-gate.
-const endOf=d=>d.pk?loc(d.pk)+KEEP:d.rd?loc(d.rd)+KEEP:d.t+7*864e5;
+// Turnarounds go 1h after e-gate, as before the return leg existed.
+const endOf=d=>d.tn?d.t+36e5:d.pk?loc(d.pk)+KEEP:d.rd?loc(d.rd)+KEEP:d.t+7*864e5;
+const retShown=d=>!d.tn&&(!!d.pk||Date.now()>=d.t);let shownSig="";
 let editing=null;const pday={};
 function plan(eg){
   const d0=day0(eg),E=(eg-d0)/6e4;let b=null;
@@ -176,15 +178,16 @@ function render(){
     ${p.gap>MAXEARLY?`<div class="warn">No bus lands within ${MAXEARLY} min of e-gate. Best option arrives ${p.gap} min early.</div>`:""}
     <div class="hint">Arrive ${p.gap} min early · backup bus ${hm(p.backup)} (arrives ${hm(p.backupArr)}${p.backupArr>t?", after e-gate":""})</div></div>
     ${retHtml(d)}
-    <div class="foot">${d.pk&&!d.tn?editing===t?`<button class="ghost fl" data-pc="${t}">Cancel</button>`:`<button class="ghost fl" data-pe="${t}">Change pickup</button>`:"<span></span>"}<button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
+    <div class="foot">${d.pk&&retShown(d)?editing===t?`<button class="ghost fl" data-pc="${t}">Cancel</button>`:`<button class="ghost fl" data-pe="${t}">Change pickup</button>`:"<span></span>"}<button class="ghost" data-x="${t}">Remove</button></div></div>`}).join("")
   :'<div class="card empty">No e-gates yet. Add your roster at the bottom, or add one manually.</div>';
+  shownSig=duties.map(retShown).join();
   widgetState();
 }
 function retHtml(d){
   const t=d.t,rf=rflight(d),rs=rsector(d),q=rplan(d),dep=d.rd?`<div class="step k"><span>Flight departs</span><b>${lhm(d.rd)}</b></div>`:"";
   const head=`<div class="head"><span class="day">${d.rd?ldl(d.rd)+" · ":""}${rf?esc(rf):"Return"}${rs?` <span class="sct">${esc(rs)}</span>`:""}</span></div>`;
-  // Turnaround: no hotel, so no pickup. Just the return flight.
-  if(d.tn)return`<hr class="sep"><div class="rt">${head}<div class="hint">Turnaround · flight departs ${lhm(d.rd)} local${d.rr?` · lands DXB ${esc(d.rr)}`:""}</div></div>`;
+  // Turnarounds have no hotel, so no return section. Layovers get it once the e-gate opens (or a pickup is set).
+  if(!retShown(d))return"";
   if(!q||editing===t){
     // Pickup day: the one being picked, else the pickup's, the return flight's, or the day after e-gate.
     const w=W(t),day=pday[t]??(q?lday(d.pk):d.rd?lday(d.rd):nv(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate()+1));pday[t]=day;
@@ -232,7 +235,7 @@ function buses(){if(!$("bus").open)return;const now=Date.now(),row=(t,L)=>`<div 
   $("bx").innerHTML=row("To EGHQ · from SAFA TWR",nextBus(T,now))+row("To SAFA TWR · from EGHQ",nextBus(H,now))}
 function tick(){buses();
   const now=Date.now(),keep=duties.filter(d=>now<endOf(d));
-  if(keep.length!==duties.length){duties=keep;save();render()}
+  if(keep.length!==duties.length||duties.map(retShown).join()!==shownSig){duties=keep;save();render()}
   document.querySelectorAll(".ob[data-dep]").forEach(o=>o.classList.toggle("done",now>+o.dataset.dep));
   const el=$("tm");let n=null;
   duties.forEach(d=>{const p=plan(d.t),q=rplan(d),e=now<p.wake?{t:p.wake,k:"w"}:now<p.dep?{t:p.dep,k:"b"}:null,
